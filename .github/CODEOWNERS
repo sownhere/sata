@@ -1,0 +1,11 @@
+# Default owner for everything
+* @sownhere
+
+# Uncomment and assign as the team grows:
+# /src/api/          @sownhere
+# /src/runner/       @sownhere
+# /src/report/       @sownhere
+# /.github/          @sownhere
+# /docs/             @sownhere
+# pyproject.toml     @sownhere
+# requirements*.txt  @sownhere

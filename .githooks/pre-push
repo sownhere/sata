@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Prevent direct push to protected branches
+protected_branches="main develop"
+current_branch=$(git symbolic-ref HEAD | sed 's|refs/heads/||')
+
+for branch in $protected_branches; do
+    if [ "$current_branch" = "$branch" ]; then
+        echo ""
+        echo "Direct push to '$branch' is not allowed."
+        echo "  Create a branch and open a PR instead."
+        echo ""
+        exit 1
+    fi
+done
