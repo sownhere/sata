@@ -33,6 +33,23 @@ jobs:
       - name: Check formatting with ruff
         run: ruff format --check .
 
+      - name: Enforce single commit on PR branch
+        if: github.event_name == 'pull_request'
+        run: |
+          commit_count=$(git rev-list --count ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          echo "Commits on this branch: $commit_count"
+          if [ "$commit_count" -gt 1 ]; then
+            echo ""
+            echo "This PR has $commit_count commits. Squash them into 1 before pushing."
+            echo ""
+            echo "  git rebase -i ${{ github.event.pull_request.base.ref }}"
+            echo "  # mark all commits except the first as 'squash'"
+            echo "  git push --force-with-lease"
+            echo ""
+            exit 1
+          fi
+          echo "Single commit check passed"
+
       - name: Validate PR commit messages
         if: github.event_name == 'pull_request'
         run: |
