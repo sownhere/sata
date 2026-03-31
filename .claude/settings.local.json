@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config:*)",
+      "Bash(chmod +x .githooks/commit-msg .githooks/pre-push)",
+      "Bash(git commit:*)",
+      "Bash(gh auth:*)",
+      "Bash(git remote:*)",
+      "Bash(python -m pytest tests/ -x --tb=short)",
+      "Bash(python3 -m pytest tests/ -x --tb=short)",
+      "Bash(pip3 install:*)",
+      "Bash(python3:*)",
+      "Bash(python -m pytest tests/test_spec_parser.py tests/test_parse_spec_node.py -v)"
+    ]
+  }
+}

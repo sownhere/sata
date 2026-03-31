@@ -1,0 +1,89 @@
+# generated: 2026-03-30
+# last_updated: 2026-03-31 (updated by dev-story)
+# project: sata
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-30
+last_updated: 2026-03-31
+project: sata
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ─── Epic 1: Working Foundation — Project Setup & Spec Ingestion ───
+  epic-1: in-progress
+  1-1-project-foundation-scaffold-and-pipeline-skeleton: done
+  1-2-openapi-swagger-file-upload-and-parsing: done
+  1-3-api-spec-url-import: review
+  1-4-spec-gap-detection-and-targeted-questions: review
+  1-5-conversational-api-description-and-zero-endpoint-fallback: review
+  epic-1-retrospective: optional
+
+  # ─── Epic 2: Spec Review & Human Checkpoint ───
+  epic-2: in-progress
+  2-1-spec-review-panel-endpoint-table-display: review
+  2-2-spec-editing-modify-add-and-remove-endpoints-and-fields: backlog
+  2-3-spec-confirmation-and-rejection-checkpoint: backlog
+  epic-2-retrospective: optional
+
+  # ─── Epic 3: Test Plan Generation & Configuration ───
+  epic-3: backlog
+  3-1-test-case-generation-categories-and-priorities: backlog
+  3-2-test-plan-review-category-toggles-and-destructive-warnings: backlog
+  3-3-test-plan-confirmation-and-rejection-checkpoint: backlog
+  epic-3-retrospective: optional
+
+  # ─── Epic 4: Test Execution & Analysis ───
+  epic-4: backlog
+  4-1-http-test-execution-with-auth-and-retry: backlog
+  4-2-response-validation-and-pass-fail-detection: backlog
+  4-3-failure-analysis-and-developer-friendly-explanations: backlog
+  4-4-smart-diagnosis-all-pass-suggestions-and-all-fail-detection: backlog
+  epic-4-retrospective: optional
+
+  # ─── Epic 5: Results Dashboard, Reporting & Iteration ───
+  epic-5: backlog
+  5-1-results-dashboard-pass-fail-metrics-and-defect-heatmap: backlog
+  5-2-failure-drill-down-request-response-and-explanation-view: backlog
+  5-3-results-report-generation: backlog
+  5-4-deeper-analysis-re-test-loop-and-iteration: backlog
+  epic-5-retrospective: optional
+
+  # ─── Epic 6: Pipeline Observability & Demo Mode ───
+  epic-6: in-progress
+  6-1-agent-reasoning-logs-tool-selection-transparency: backlog
+  6-2-langgraph-pipeline-visualization: review
+  6-3-demo-mode-sample-apis-and-guided-end-to-end-flow: backlog
+  epic-6-retrospective: optional

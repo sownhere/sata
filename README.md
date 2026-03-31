@@ -54,23 +54,26 @@ Sata ingests API documentation or user-provided input, plans and runs API tests,
 
 ---
 
-## Mô tả tính năng (tiếng Việt)
-
-- Tự động phân tích tài liệu API hoặc thông tin đầu vào của người dùng để xác định endpoint, method, tham số, request body và các điều kiện kiểm thử quan trọng.
-- Tự động sinh bộ test case cho API, bao gồm cả trường hợp hợp lệ, thiếu dữ liệu, sai định dạng, sai kiểu dữ liệu, lỗi xác thực và các trường hợp biên.
-- Tự động gửi request kiểm thử và đối chiếu kết quả trả về theo status code, cấu trúc dữ liệu, nội dung response và logic nghiệp vụ mong đợi.
-- Tự động phát hiện các lỗi phổ biến của API như validate chưa chặt, response sai cấu trúc, xử lý exception chưa đúng hoặc thông báo lỗi chưa nhất quán.
-- Tổng hợp kết quả thành báo cáo trực quan trên giao diện Streamlit/Gradio, giúp người dùng dễ theo dõi các test case pass/fail, log lỗi và nguyên nhân tiềm năng.
-- Hỗ trợ rút ngắn thời gian kiểm thử thủ công, nâng cao độ bao phủ test và hỗ trợ developer/tester debug nhanh hơn.
-
----
-
 ## Repository
 
 Git workflow, branches, commits, and PR rules for this project are documented in [`GIT_CONVENTION.md`](./GIT_CONVENTION.md).
 
 ---
 
-## Status
+## Getting Started
 
-This repository is under active definition; implementation details and setup instructions will be added as the stack and layout stabilize.
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment**:
+   Copy `.env.example` to `.env` and fill in the required variables:
+   - `LLM_API_KEY`
+   - `LLM_CHAT_MODEL`
+   - `LLM_BASE_URL`
+
+3. **Run the application**:
+   ```bash
+   streamlit run app.py
+   ```

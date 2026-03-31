@@ -28,10 +28,22 @@ jobs:
         run: pip install ruff
 
       - name: Lint with ruff
-        run: ruff check .
+        run: |
+          py_files=$(git ls-files --cached --others --exclude-standard -- '*.py' ':(exclude)_bmad/**' ':(exclude).agents/**' ':(exclude).claude/**' ':(exclude).cursor/**')
+          if [ -z "$py_files" ]; then
+            echo "No Python source files found — skipping"
+          else
+            printf '%s\n' "$py_files" | xargs ruff check
+          fi
 
       - name: Check formatting with ruff
-        run: ruff format --check .
+        run: |
+          py_files=$(git ls-files --cached --others --exclude-standard -- '*.py' ':(exclude)_bmad/**' ':(exclude).agents/**' ':(exclude).claude/**' ':(exclude).cursor/**')
+          if [ -z "$py_files" ]; then
+            echo "No Python source files found — skipping"
+          else
+            printf '%s\n' "$py_files" | xargs ruff format --check
+          fi
 
       - name: Enforce single commit on PR branch
         if: github.event_name == 'pull_request'
@@ -120,9 +132,9 @@ jobs:
 
       - name: Syntax check
         run: |
-          py_files=$(find . -name "*.py" -not -path "./.git/*" | head -1)
+          py_files=$(git ls-files --cached --others --exclude-standard -- '*.py')
           if [ -z "$py_files" ]; then
             echo "No Python source files found — skipping"
           else
-            python -m compileall . -q
+            printf '%s\n' "$py_files" | xargs python -m py_compile
           fi
