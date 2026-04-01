@@ -142,6 +142,16 @@ FR38: Epic 5 — System generates a results report with pass/fail summary and de
 FR39: Epic 6 — User can select from pre-loaded sample APIs for quick demo
 FR40: Epic 6 — System provides a guided demo flow that runs end-to-end on sample data
 FR41: Epic 1 — System falls back to conversational mode when zero endpoints are found
+STRUCT-1: Epic 7 — Extract pipeline nodes from monolith pipeline.py into individual files under src/nodes/
+STRUCT-2: Epic 7 — Deterministic tools separated into src/tools/
+STRUCT-3: Epic 7 — Prompts externalized from inline strings into markdown files under src/prompts/
+STRUCT-4: Epic 7 — Pydantic models defined in src/core/models.py
+STRUCT-5: Epic 7 — UI code separated into src/ui/
+STRUCT-6: Epic 7 — Graph construction and routing logic isolated in src/core/graph.py
+STRUCT-7: Epic 7 — Configuration supports env vars (secrets) + settings.yaml (tuning)
+STRUCT-8: Epic 7 — Tests organized into 3 tiers: unit/, integration/, e2e/
+STRUCT-9: Epic 7 — Future tools follow src/tools/ convention
+STRUCT-10: Epic 7 — src/utils/ reserved for pure infrastructure utilities
 
 ## Epic List
 
@@ -177,6 +187,11 @@ Users can explore results through a drill-down dashboard with pass/fail metrics,
 Users and developers can inspect agent reasoning logs, visualize the full LangGraph pipeline as a diagram, and run end-to-end guided demos on pre-loaded sample APIs (PetStore, ReqRes, JSONPlaceholder).
 **FRs covered:** FR36, FR37, FR39, FR40
 **NFRs:** NFR7, NFR8
+
+### Epic 7: Source Architecture Restructuring
+Restructure the codebase from flat `app/` into production-grade `src/` with separated nodes, tools, core, prompts, and UI layers — enabling faster development and independent testability for all future epics.
+**Requirements covered:** STRUCT-1 through STRUCT-10
+**NFR relevance:** NFR2
 
 ---
 
@@ -833,4 +848,264 @@ So that I can see the complete tool in action without needing my own API or spec
 **Given** the demo completes
 **When** the results dashboard is shown
 **Then** the experience is identical to a real run — the developer sees a genuine pass/fail report they can drill into
+
+---
+
+## Epic 7: Source Architecture Restructuring
+
+Restructure the Sata codebase from the current flat `app/` layout into a production-grade `src/` architecture with separated nodes, tools, core, prompts, and UI layers — so that all future epic implementations (Epics 2–6) are faster to build, easier to test, and independently maintainable. This epic delivers "developer as user" value: a clean, navigable, best-practice codebase.
+
+**Requirements covered:** STRUCT-1 through STRUCT-10
+**NFR relevance:** NFR2 (isolated node files enable per-node error handling)
+**Reference:** Source Architecture Document (`docs/source-architecture.md`)
+
+### Story 7.1: Scaffold `src/` Package & Migrate Core Module
+
+As a developer working on Sata,
+I want the core state, data models, and configuration consolidated in `src/core/`,
+So that all pipeline nodes and tools import from a single, well-typed foundation layer.
+
+**Acceptance Criteria:**
+
+**Given** the current codebase has `app/state.py` and env validation in `app/utils/env.py`
+**When** the migration is applied
+**Then** `src/core/__init__.py`, `src/core/state.py`, and `src/core/config.py` exist
+**And** `SataState` is importable from `src.core.state` with identical TypedDict fields and `initial_state()` function
+**And** `src/core/config.py` consolidates `load_env()` and `validate_env()` from the former `env.py`
+
+**Given** the new `src/core/` module exists
+**When** the developer inspects `src/core/models.py`
+**Then** Pydantic models are defined for: `EndpointModel`, `AuthModel`, `ApiModel` (matching the canonical API model dict schema), and `GapRecord` (matching the gap record dict schema)
+**And** each model includes field-level docstrings and correct `Optional` typing
+**And** the models validate correctly against existing test fixtures from `test_spec_parser.py` and `test_spec_gap_detector.py`
+
+**Given** the new `src/` package structure exists
+**When** the developer runs `pytest tests/ --tb=short -q`
+**Then** all existing tests pass without modification (backward compatibility maintained via re-exports or import aliases if needed during transition)
+
+**Given** `src/core/` is established
+**When** the developer inspects `src/__init__.py`
+**Then** it exists and the `src` package is importable
+
+---
+
+### Story 7.2: Extract Deterministic Tools to `src/tools/`
+
+As a developer working on Sata,
+I want all deterministic business logic tools separated into `src/tools/`,
+So that tools can be tested independently without the LangGraph framework and reused across multiple pipeline nodes.
+
+**Acceptance Criteria:**
+
+**Given** the current codebase has `app/utils/spec_parser.py`, `app/utils/spec_fetcher.py`, `app/utils/spec_gap_detector.py`, and `app/utils/conversational_spec_builder.py`
+**When** the migration is applied
+**Then** the following files exist under `src/tools/`:
+- `src/tools/spec_parser.py` (from `app/utils/spec_parser.py`)
+- `src/tools/spec_fetcher.py` (from `app/utils/spec_fetcher.py`)
+- `src/tools/gap_detector.py` (renamed from `app/utils/spec_gap_detector.py`)
+- `src/tools/conversational_builder.py` (from `app/utils/conversational_spec_builder.py`)
+**And** `src/tools/__init__.py` exists with public API re-exports
+
+**Given** tools are migrated to `src/tools/`
+**When** the developer inspects each tool module
+**Then** no tool imports from `app/`, Streamlit, or LangGraph — only from `src/core/`, standard library, and third-party parsing libraries
+**And** the dependency direction is strictly: `tools → core` (never `tools → nodes` or `tools → ui`)
+
+**Given** all tools are migrated
+**When** the developer runs `pytest tests/ --tb=short -q`
+**Then** all existing tool-related tests pass (with updated imports)
+
+**Given** future tools will be added in Epics 3–5
+**When** a developer creates `src/tools/api_client.py` or `src/tools/data_generator.py`
+**Then** the convention and `__init__.py` pattern is already established for them to follow
+
+---
+
+### Story 7.3: Extract Pipeline Nodes to `src/nodes/`
+
+As a developer working on Sata,
+I want each pipeline node extracted from the monolith `pipeline.py` into its own file under `src/nodes/`,
+So that each node can be developed, tested, and reviewed independently without scrolling through 600+ lines.
+
+**Acceptance Criteria:**
+
+**Given** the current `app/pipeline.py` contains 10 node handler functions, 6 routing functions, metadata dicts, instrumentation logic, and `build_pipeline()`
+**When** the extraction is applied
+**Then** the following files exist under `src/nodes/`:
+- `src/nodes/ingest_spec.py`
+- `src/nodes/parse_spec.py`
+- `src/nodes/detect_gaps.py`
+- `src/nodes/fill_gaps.py`
+- `src/nodes/review_spec.py`
+- `src/nodes/generate_tests.py` (stub)
+- `src/nodes/review_test_plan.py` (stub)
+- `src/nodes/execute_tests.py` (stub)
+- `src/nodes/analyze_results.py` (stub)
+- `src/nodes/review_results.py` (stub)
+**And** `src/nodes/__init__.py` re-exports all node handler functions
+
+**Given** nodes are extracted
+**When** the developer inspects each node file
+**Then** each file contains exactly one node handler function with signature `def <node_name>(state: SataState) -> SataState`
+**And** each node imports from `src.core.state` and `src.tools.*` — never from other node files
+**And** helper functions private to that node (e.g., `_is_actionable_answer()`) live in the same file, prefixed with `_`
+
+**Given** routing logic and graph construction remain
+**When** the developer inspects `src/core/graph.py`
+**Then** it contains: `PIPELINE_NODE_ORDER`, `PIPELINE_NODE_METADATA`, all `_route_*` functions, `build_pipeline()`, and instrumentation helpers
+**And** it imports node handlers from `src.nodes`
+
+**Given** all nodes are extracted
+**When** the developer runs `pytest tests/ --tb=short -q`
+**Then** all existing pipeline tests pass with updated imports
+
+---
+
+### Story 7.4: Externalize Prompts to `src/prompts/`
+
+As a developer working on Sata,
+I want all LLM prompt strings externalized into versioned markdown files under `src/prompts/`,
+So that prompts can be reviewed, diffed, and tuned without modifying Python code.
+
+**Acceptance Criteria:**
+
+**Given** `app/utils/conversational_spec_builder.py` contains an inline prompt in `_build_prompt()` and `app.py` contains `CONVERSATION_PROMPT` and `ZERO_ENDPOINT_FALLBACK_MESSAGE`
+**When** the externalization is applied
+**Then** the following files exist under `src/prompts/`:
+- `src/prompts/conversational_extraction.md` — the full system prompt for API model extraction from conversation
+- `src/prompts/conversation_starter.md` — the user-facing prompt text and fallback message
+**And** placeholder files are created for future prompts:
+- `src/prompts/test_generation.md`
+- `src/prompts/result_analysis.md`
+- `src/prompts/gap_filling.md`
+
+**Given** prompts are externalized
+**When** the developer inspects `src/core/prompts.py` (new utility)
+**Then** a `load_prompt(name: str) -> str` function exists that reads from `src/prompts/{name}.md`
+**And** the function caches loaded prompts to avoid repeated file I/O
+**And** it raises `FileNotFoundError` with a clear message if the prompt file does not exist
+
+**Given** prompt files are loaded at runtime
+**When** the developer runs `pytest tests/ --tb=short -q`
+**Then** all tests involving `conversational_spec_builder` pass with prompts loaded from files instead of inline strings
+
+**Given** a developer wants to tune the conversational extraction prompt
+**When** they edit `src/prompts/conversational_extraction.md`
+**Then** no Python file needs to change — the prompt is picked up on next execution
+
+---
+
+### Story 7.5: Separate UI Layer into `src/ui/`
+
+As a developer working on Sata,
+I want all Streamlit-specific presentation code separated into `src/ui/`,
+So that UI formatting, visualization, and layout logic are isolated from business logic and pipeline orchestration.
+
+**Acceptance Criteria:**
+
+**Given** the current codebase has UI formatting in `app/utils/spec_review.py`, `app/utils/pipeline_visualization.py`, and inline Streamlit code in `app.py`
+**When** the separation is applied
+**Then** the following files exist under `src/ui/`:
+- `src/ui/spec_review.py` (from `app/utils/spec_review.py`)
+- `src/ui/visualization.py` (from `app/utils/pipeline_visualization.py`)
+- `src/ui/components.py` (shared Streamlit widget helpers extracted from `app.py`)
+**And** `src/ui/__init__.py` exists
+
+**Given** UI modules are separated
+**When** the developer inspects each `src/ui/` module
+**Then** UI modules may import from `src.core` (for state types and metadata) but never from `src.nodes` or `src.tools`
+**And** the dependency direction is: `ui → core` (never `ui → nodes` or `ui → tools`)
+
+**Given** the root `app.py` remains as entrypoint
+**When** the developer inspects it after migration
+**Then** `app.py` is a thin entrypoint that imports from `src.ui`, `src.core.config`, and `src.core.graph`
+**And** `app.py` contains no business logic — only Streamlit layout orchestration and session state wiring
+
+**Given** all UI code is migrated
+**When** the developer runs `streamlit run app.py`
+**Then** the application starts and functions identically to before the migration
+
+---
+
+### Story 7.6: Reorganize Tests into 3-Tier Structure
+
+As a developer working on Sata,
+I want the test suite organized into `tests/unit/`, `tests/integration/`, and `tests/e2e/` tiers,
+So that I can run fast unit tests during development and slower integration/e2e tests in CI.
+
+**Acceptance Criteria:**
+
+**Given** the current `tests/` directory contains 11 flat test files
+**When** the reorganization is applied
+**Then** the following structure exists:
+```
+tests/
+├── __init__.py
+├── unit/
+│   ├── __init__.py
+│   ├── test_state.py
+│   ├── test_env.py
+│   ├── test_spec_parser.py
+│   ├── test_spec_gap_detector.py
+│   ├── test_spec_fetcher.py
+│   ├── test_spec_review.py
+│   ├── test_conversational_spec_builder.py
+│   └── test_pipeline_visualization.py
+├── integration/
+│   ├── __init__.py
+│   ├── test_pipeline.py
+│   ├── test_parse_spec_node.py
+│   └── test_review_spec_node.py
+└── e2e/
+    ├── __init__.py
+    └── .gitkeep
+```
+
+**Given** tests are reorganized
+**When** the developer runs `pytest tests/ --tb=short -q`
+**Then** all tests are discovered and pass — the CI command does not change
+
+**Given** the developer wants to run only fast unit tests during development
+**When** they run `pytest tests/unit/ --tb=short -q`
+**Then** only unit tests execute (no integration or e2e)
+
+**Given** the test reorganization is complete
+**When** the developer inspects test imports
+**Then** all imports reference `src.*` modules (not `app.*`)
+
+---
+
+### Story 7.7: Add Configuration Layer with `config/settings.yaml`
+
+As a developer working on Sata,
+I want non-secret configuration (retry counts, timeouts, max iterations, model parameters) managed in a `config/settings.yaml` file alongside `.env` for secrets,
+So that I can tune pipeline behavior without modifying Python code.
+
+**Acceptance Criteria:**
+
+**Given** all configuration is currently in environment variables only
+**When** the config layer is added
+**Then** `config/settings.yaml` exists with documented default values for:
+- `pipeline.max_iterations` (default: 10)
+- `pipeline.node_timeout_seconds` (default: 30)
+- `execution.request_timeout_seconds` (default: 30)
+- `execution.retry_count` (default: 1)
+- `execution.max_spec_size_bytes` (default: 10485760)
+- `llm.temperature` (default: 0.0)
+- `llm.max_tokens` (default: 4096)
+
+**Given** `config/settings.yaml` exists
+**When** the developer inspects `src/core/config.py`
+**Then** it loads settings from `config/settings.yaml` using PyYAML
+**And** it merges with environment variables (env vars override yaml for secrets)
+**And** it exposes a typed `Settings` object (Pydantic `BaseSettings` or simple dataclass)
+
+**Given** a developer changes `pipeline.max_iterations` in `config/settings.yaml`
+**When** the app restarts
+**Then** the new value is used by all pipeline nodes without any Python code changes
+
+**Given** the config layer is complete
+**When** the developer runs `pytest tests/ --tb=short -q`
+**Then** all tests pass, using default config values when no yaml file is present
+
 

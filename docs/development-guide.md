@@ -44,6 +44,11 @@ pytest tests/
 
 ## Common Development Tasks
 
-- **Updating the State**: Modify `app/state.py` if new information must be tracked across the LangGraph pipeline. Be sure to update initial default values.
-- **Adding Pipeline Nodes**: Open `app/pipeline.py` to draft a new function node and register it in `build_pipeline()`.
-- **Parsing Logic**: Add new OpenAPI rules directly into `app/utils/spec_parser.py` or modify gap questions in `app/utils/spec_gap_detector.py`.
+> **Note:** The project is migrating from `app/` to `src/`. See [`source-architecture.md`](./source-architecture.md) for the target layout. Paths below show current → target.
+
+- **Updating the State**: Modify `app/state.py` → `src/core/state.py` if new information must be tracked across the LangGraph pipeline. Be sure to update initial default values.
+- **Adding Pipeline Nodes**: Currently in `app/pipeline.py` → target: create a new file in `src/nodes/` with a handler function, then register it in `src/core/graph.py` → `build_pipeline()`.
+- **Adding Tools**: Currently in `app/utils/` → target: create a new file in `src/tools/`. Tools must not import from `nodes/`, `ui/`, or other tools.
+- **Parsing Logic**: Add new OpenAPI rules in `app/utils/spec_parser.py` → `src/tools/spec_parser.py` or modify gap questions in `app/utils/spec_gap_detector.py` → `src/tools/gap_detector.py`.
+- **Modifying Prompts**: Currently inline strings → target: edit markdown files in `src/prompts/`. No Python changes needed.
+- **Running Unit Tests Only**: `pytest tests/unit/ --tb=short -q` (after test reorganization).
