@@ -54,6 +54,10 @@ Sata ingests API documentation or user-provided input, plans and runs API tests,
 
 ---
 
+## Architecture
+
+Source code structure, dependency rules, and migration plan are documented in [`docs/source-architecture.md`](./docs/source-architecture.md).
+
 ## Repository
 
 Git workflow, branches, commits, and PR rules for this project are documented in [`GIT_CONVENTION.md`](./GIT_CONVENTION.md).

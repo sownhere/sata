@@ -19,6 +19,7 @@
 - [Source Tree Analysis](./source-tree-analysis.md)
 - [Development Guide](./development-guide.md)
 - [Component Inventory](./component-inventory.md)
+- [Source Architecture](./source-architecture.md)
 - [Deployment Guide](./deployment-guide.md)
 
 ### Existing Documentation

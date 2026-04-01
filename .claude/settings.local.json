@@ -10,7 +10,28 @@
       "Bash(python3 -m pytest tests/ -x --tb=short)",
       "Bash(pip3 install:*)",
       "Bash(python3:*)",
-      "Bash(python -m pytest tests/test_spec_parser.py tests/test_parse_spec_node.py -v)"
+      "Bash(python -m pytest tests/test_spec_parser.py tests/test_parse_spec_node.py -v)",
+      "Bash(find /Users/sontv2/Workspace/Sown/sata -maxdepth 2 -name CLAUDE.md -o -name .cursorrules -o -name *.json -type f)",
+      "Bash(git -C /Users/sontv2/Workspace/Sown/sata config core.hooksPath)",
+      "Bash(git:*)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/langchain-ai/langgraph/main/README.md\")",
+      "Bash(ls -la /Users/sontv2/Workspace/Sown/sata/*.toml /Users/sontv2/Workspace/Sown/sata/*.cfg /Users/sontv2/Workspace/Sown/sata/pyproject.toml)",
+      "Bash(curl -s https://raw.githubusercontent.com/langchain-ai/langgraph-example/main/README.md)",
+      "Bash(curl -s \"https://api.github.com/search/repositories?q=langgraph+template+language:python&sort=stars&per_page=5\")",
+      "Bash(curl -s https://api.github.com/repos/Significant-Gravitas/AutoGPT/contents/autogpt)",
+      "Bash(curl -s https://api.github.com/repos/Significant-Gravitas/AutoGPT/contents/)",
+      "Bash(grep -r \"TODO\\\\|STUB\\\\|stub\\\\|TODO\\\\|pass$\\\\|NotImplementedError\" /Users/sontv2/Workspace/Sown/sata/app --include=\"*.py\")",
+      "WebSearch",
+      "Bash(wc -l /Users/sontv2/Workspace/Sown/sata/tests/*.py /Users/sontv2/Workspace/Sown/sata/app/utils/*.py /Users/sontv2/Workspace/Sown/sata/app/*.py)",
+      "Bash(wc -l /Users/sontv2/Workspace/Sown/sata/app/*.py /Users/sontv2/Workspace/Sown/sata/app/utils/*.py)",
+      "Bash(wc -l /Users/sontv2/Workspace/Sown/sata/tests/*.py)",
+      "WebFetch(domain:docs.langchain.com)",
+      "WebFetch(domain:www.projectrules.ai)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:mastra.ai)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:openai.com)",
+      "WebFetch(domain:cdn.openai.com)"
     ]
   }
 }

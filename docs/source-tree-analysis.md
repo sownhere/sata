@@ -2,22 +2,27 @@
 
 This document provides an overview of the directory structure and key file locations for the Sata project.
 
-## Directory Tree
+> **Note:** The project is migrating from the current `app/` layout to a layered `src/` structure. See [`source-architecture.md`](./source-architecture.md) for the target layout (Epic 7).
+
+## Current Directory Tree
 
 ```
 project-root/
-├── app/                  # Main application package
+├── app/                  # Main application package (current — migrating to src/)
 │   ├── utils/            # Shared utilities
+│   │   ├── conversational_spec_builder.py  # LLM-based chat spec extraction
 │   │   ├── env.py              # Environment validation logic
+│   │   ├── pipeline_visualization.py # GraphViz pipeline diagrams
 │   │   ├── spec_fetcher.py     # Remote OpenAPI spec HTTP fetching
 │   │   ├── spec_gap_detector.py # Deterministic OpenAPI gap analysis
-│   │   └── spec_parser.py      # OpenAPI JSON/YAML parsing
+│   │   ├── spec_parser.py      # OpenAPI JSON/YAML parsing
+│   │   └── spec_review.py      # Human checkpoint UI formatting
 │   ├── __init__.py
-│   ├── app.py            # Streamlit UI entry point
-│   ├── pipeline.py       # LangGraph orchestration and nodes
+│   ├── pipeline.py       # LangGraph orchestration, nodes, routing, graph builder
 │   └── state.py          # Typed shared state definition (SataState)
 ├── docs/                 # Project knowledge and generated documentation
-├── tests/                # Test suite
+├── tests/                # Test suite (flat — migrating to unit/integration/e2e)
+├── config/               # Non-secret configuration (target: settings.yaml)
 ├── _bmad-output/         # BMAD generated artifacts and specs
 ├── _bmad/                # BMAD local configuration
 ├── .github/              # GitHub Actions workflows / repo config
@@ -28,12 +33,15 @@ project-root/
 └── CHANGELOG.md          # Version history
 ```
 
+## Target Directory Tree
+
+See [`source-architecture.md`](./source-architecture.md) for the full target structure with `src/nodes/`, `src/tools/`, `src/core/`, `src/prompts/`, `src/ui/`, and `src/utils/`.
+
 ## Critical Folders Explained
 
-- **`app/`**: Contains the core logic of the Sata AI Agent. Divided into:
-  - **`utils/`**: Helper methods for fetching and processing OpenAPI schemas, maintaining deterministic logic away from AI stubs.
-  - **`app.py`**: The Streamlit application UI layer. Displays standard inputs, persistent headers, and routes state updates back into the graph.
-  - **`pipeline.py`**: The LangGraph state machine. Defines stubs and real node logic, handling transitions based on parsed specs or chat interactions.
-  - **`state.py`**: Defines `SataState`, acting as the single source of truth passed across all nodes in the Graph.
+- **`app/`** (current): Contains all core logic in a flat layout. Being restructured into `src/` with separated concerns:
+  - **`utils/`**: Mixes deterministic tools (spec_parser, gap_detector) with UI formatting (spec_review, visualization). Target: split into `src/tools/` and `src/ui/`.
+  - **`pipeline.py`**: Monolith containing 10 node handlers, 6 routers, metadata, instrumentation, and graph builder. Target: nodes to `src/nodes/`, graph builder to `src/core/graph.py`.
+  - **`state.py`**: Defines `SataState` — single source of truth. Target: `src/core/state.py` (unchanged logic).
 
-- **`tests/`**: Contains the automated tests validating the utility methods, app components, and LangGraph workflow nodes.
+- **`tests/`**: Automated tests for utility methods, app components, and LangGraph workflow nodes. Target: 3-tier split into `unit/`, `integration/`, `e2e/`.
