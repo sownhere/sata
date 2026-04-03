@@ -3,7 +3,7 @@ import urllib.error
 
 import pytest
 
-from app.utils.spec_fetcher import fetch_spec_from_url, _OPENER
+from src.tools.spec_fetcher import _OPENER, fetch_spec_from_url
 
 
 class _FakeResponse:
@@ -133,7 +133,7 @@ class TestSpecFetcher:
         assert isinstance(raw, str)
 
     def test_html_response_is_returned_as_text_not_fetch_error(self, monkeypatch):
-        """AC3: a 200 HTML response is a fetch success; parse failure happens downstream."""
+        """AC3: a 200 HTML response is a fetch success; parse failure downstream."""
 
         def _open(_request, timeout):  # noqa: ARG001
             return _FakeResponse(

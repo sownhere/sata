@@ -1,6 +1,6 @@
 """Tests for SataState TypedDict definition (AC: 2)."""
 
-from app.state import SataState, initial_state
+from src.core.state import SataState, initial_state
 
 
 def test_sata_state_can_be_instantiated_with_defaults():

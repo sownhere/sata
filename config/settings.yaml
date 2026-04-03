@@ -1,0 +1,15 @@
+# Sata non-secret configuration — tune pipeline behaviour without code changes.
+# Secrets (API keys, tokens) belong in .env only.
+
+pipeline:
+  max_iterations: 10           # Anti-infinite-loop guard (NFR5)
+  node_timeout_seconds: 30     # Max seconds allowed per pipeline node
+
+execution:
+  request_timeout_seconds: 30  # HTTP test request timeout
+  retry_count: 1               # Number of retries on test failure
+  max_spec_size_bytes: 10485760  # 10 MB spec upload limit
+
+llm:
+  temperature: 0.0             # LLM temperature (0 = deterministic)
+  max_tokens: 4096             # Max tokens per LLM response

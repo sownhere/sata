@@ -14,7 +14,6 @@ from collections import defaultdict
 import streamlit as st
 
 from app.pipeline import (
-    PIPELINE_NODE_ORDER,
     build_pipeline,
     record_route_transition,
     reset_visualization_trace,
@@ -22,12 +21,14 @@ from app.pipeline import (
 )
 from app.state import initial_state
 from app.utils.env import load_env, validate_env
-from app.utils.pipeline_visualization import (
-    build_pipeline_graph_dot,
-    get_default_visual_node,
-    get_node_detail,
-)
 from app.utils.spec_fetcher import fetch_spec_from_url
+from src.core.prompts import load_prompt as _load_prompt
+from src.ui.components import (
+    format_gap_answer,
+    has_ui_answer,
+    render_gap_input,
+    render_pipeline_visualization,
+)
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -67,55 +68,11 @@ st.title("Sata — AI API Tester")
 st.subheader(f"Stage: {stage_label}")
 st.divider()
 
-CONVERSATION_PROMPT = (
-    "Describe your API endpoints, HTTP methods, expected inputs, success responses, "
-    "and auth style. For example: GET /users returns 200 with a list of users."
-)
+_conversation_starter = _load_prompt("conversation_starter").split("---", 1)
+CONVERSATION_PROMPT = _conversation_starter[0].strip()
 ZERO_ENDPOINT_FALLBACK_MESSAGE = (
-    "No endpoints were found in your spec. Let's describe them together."
+    _conversation_starter[1].strip() if len(_conversation_starter) > 1 else ""
 )
-
-
-def _render_gap_input(gap: dict, current_answer):
-    key = f"gap-answer-{gap['id']}"
-    input_type = gap.get("input_type")
-    if input_type == "select":
-        widget_options = [""] + list(gap.get("options") or [])
-        try:
-            index = (
-                widget_options.index(current_answer)
-                if current_answer in widget_options
-                else 0
-            )
-        except ValueError:
-            index = 0
-        return st.selectbox(
-            gap["question"], options=widget_options, index=index, key=key
-        )
-    if input_type == "multiselect":
-        return st.multiselect(
-            gap["question"],
-            options=list(gap.get("options") or []),
-            default=current_answer or [],
-            key=key,
-        )
-    if input_type == "text_input":
-        return st.text_input(gap["question"], value=current_answer or "", key=key)
-    return st.text_area(gap["question"], value=current_answer or "", key=key)
-
-
-def _has_ui_answer(answer) -> bool:
-    if isinstance(answer, str):
-        return bool(answer.strip())
-    if isinstance(answer, list):
-        return bool(answer)
-    return answer is not None
-
-
-def _format_gap_answer(answer) -> str:
-    if isinstance(answer, list):
-        return ", ".join(str(item) for item in answer)
-    return str(answer)
 
 
 def _conversation_mode_active(current_state) -> bool:
@@ -195,48 +152,6 @@ def _finalize_parsed_state_after_ingestion(updated_state):
     return updated_state
 
 
-def _render_pipeline_visualization(current_state):
-    with st.expander("Developer: Pipeline Visualization", expanded=True):
-        st.caption(
-            "Observe the current pipeline node, the completed path, and the routing branches available from each stage."
-        )
-        st.graphviz_chart(
-            build_pipeline_graph_dot(current_state), use_container_width=True
-        )
-        st.caption(
-            "Legend: active = amber, completed = green, taken path = bold blue, untaken conditional path = dashed gray."
-        )
-
-        default_node = get_default_visual_node(current_state)
-        selected_index = PIPELINE_NODE_ORDER.index(default_node)
-        selected_node = st.selectbox(
-            "Inspect node",
-            options=PIPELINE_NODE_ORDER,
-            index=selected_index,
-            format_func=lambda node_name: get_node_detail(node_name)["label"],
-            key="pipeline-visual-node-selector",
-        )
-        current_state["selected_visual_node"] = selected_node
-
-        node_detail = get_node_detail(selected_node)
-        st.markdown(f"**{node_detail['label']}**")
-        st.write(node_detail["role"])
-
-        if current_state.get("active_node") == selected_node:
-            st.info("This node is currently active in the visualization.")
-        elif selected_node in (current_state.get("completed_nodes") or []):
-            st.success("This node has completed in the current recorded run.")
-        else:
-            st.caption("This node has not been reached in the current recorded run.")
-
-        taken_edges = current_state.get("taken_edges") or []
-        if taken_edges:
-            last_edge = taken_edges[-1]
-            st.caption(
-                f"Most recent transition: `{last_edge['source']}` → `{last_edge['target']}`"
-            )
-
-
 # ── Stage-driven content rendering ────────────────────────────────────────
 state = st.session_state.state
 current_stage = state["pipeline_stage"]
@@ -244,7 +159,7 @@ current_stage = state["pipeline_stage"]
 if state.get("error_message"):
     st.error(state["error_message"])
 
-_render_pipeline_visualization(state)
+render_pipeline_visualization(state)
 
 if current_stage in ("spec_ingestion", "spec_parsed"):
     if not state.get("parsed_api_model"):
@@ -379,7 +294,8 @@ elif current_stage == "fill_gaps":
             st.rerun()
     else:
         st.info(
-            "**Next:** Answer the clarification questions below so Sata can prepare the spec for review."
+            "**Next:** Answer the clarification questions below so Sata can"
+            " prepare the spec for review."
         )
         detected_gaps = state.get("detected_gaps") or []
         grouped_gaps = defaultdict(list)
@@ -392,7 +308,7 @@ elif current_stage == "fill_gaps":
             for endpoint_key, endpoint_gaps in grouped_gaps.items():
                 st.markdown(f"### {endpoint_key}")
                 for gap in endpoint_gaps:
-                    updated_answers[gap["id"]] = _render_gap_input(
+                    updated_answers[gap["id"]] = render_gap_input(
                         gap, updated_answers.get(gap["id"])
                     )
 
@@ -402,7 +318,7 @@ elif current_stage == "fill_gaps":
             state["gap_answers"] = {
                 gap_id: answer
                 for gap_id, answer in updated_answers.items()
-                if _has_ui_answer(answer)
+                if has_ui_answer(answer)
             }
             updated_state = run_pipeline_node(state, "fill_gaps")
             if not updated_state.get("error_message"):
@@ -413,14 +329,16 @@ elif current_stage == "fill_gaps":
 elif current_stage == "review_spec":
     model = state.get("parsed_api_model") or {}
     endpoint_count = len(model.get("endpoints", []))
+    plural = "s" if endpoint_count != 1 else ""
     st.success(
-        f"Spec ready for review: found {endpoint_count} endpoint{'s' if endpoint_count != 1 else ''} "
-        f"for '{model.get('title', 'API')}'."
+        f"Spec ready for review: found {endpoint_count} endpoint{plural}"
+        f" for '{model.get('title', 'API')}'."
     )
     st.info(
-        "**Next:** Story 2.1 will provide the full review panel. This story completes the clarification checkpoint."
+        "**Next:** Story 2.1 will provide the full review panel."
+        " This story completes the clarification checkpoint."
     )
     if state.get("gap_answers"):
         st.markdown("### Clarifications captured")
         for gap_id, answer in state["gap_answers"].items():
-            st.write(f"- `{gap_id}`: {_format_gap_answer(answer)}")
+            st.write(f"- `{gap_id}`: {format_gap_answer(answer)}")

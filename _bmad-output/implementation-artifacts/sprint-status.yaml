@@ -1,5 +1,5 @@
 # generated: 2026-03-30
-# last_updated: 2026-03-31 (updated by dev-story)
+# last_updated: 2026-04-03 (updated by dev-story)
 # project: sata
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-30
-last_updated: 2026-03-31
+last_updated: 2026-04-03
 project: sata
 project_key: NOKEY
 tracking_system: file-system
@@ -54,7 +54,7 @@ development_status:
   # ─── Epic 2: Spec Review & Human Checkpoint ───
   epic-2: in-progress
   2-1-spec-review-panel-endpoint-table-display: review
-  2-2-spec-editing-modify-add-and-remove-endpoints-and-fields: backlog
+  2-2-spec-editing-modify-add-and-remove-endpoints-and-fields: ready-for-dev
   2-3-spec-confirmation-and-rejection-checkpoint: backlog
   epic-2-retrospective: optional
 
@@ -87,3 +87,14 @@ development_status:
   6-2-langgraph-pipeline-visualization: review
   6-3-demo-mode-sample-apis-and-guided-end-to-end-flow: backlog
   epic-6-retrospective: optional
+
+  # ─── Epic 7: Source Architecture Restructuring ───
+  epic-7: in-progress
+  7-1-scaffold-src-package-and-migrate-core-module: done
+  7-2-extract-deterministic-tools-to-src-tools: done
+  7-3-extract-pipeline-nodes-to-src-nodes: done
+  7-4-externalize-prompts-to-src-prompts: done
+  7-5-separate-ui-layer-into-src-ui: done
+  7-6-reorganize-tests-into-3-tier-structure: done
+  7-7-add-configuration-layer-with-config-settings-yaml: done
+  epic-7-retrospective: optional

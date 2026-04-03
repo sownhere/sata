@@ -31,7 +31,22 @@
       "WebFetch(domain:mastra.ai)",
       "WebFetch(domain:dev.to)",
       "WebFetch(domain:openai.com)",
-      "WebFetch(domain:cdn.openai.com)"
+      "WebFetch(domain:cdn.openai.com)",
+      "Bash(pytest:*)",
+      "Bash(python:*)",
+      "Bash(pip3 show:*)",
+      "Bash(pyenv which:*)",
+      "Read(//Users/sontv2/.pyenv/**)",
+      "Bash(pip3 list:*)",
+      "Bash(ls tests/test_*.py)",
+      "Bash(mkdir -p \"/Users/sontv2/Workspace/Sown/sata/_bmad-output/implementation-artifacts\")",
+      "Bash(uv run:*)",
+      "Read(//Users/sontv2/.local/bin/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(/opt/homebrew/bin/python3 -m pytest tests/ --tb=short -q)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(uvx ruff:*)",
+      "Bash(chmod +x /Users/sown/Documents/AI/sata/.githooks/pre-commit)"
     ]
   }
 }

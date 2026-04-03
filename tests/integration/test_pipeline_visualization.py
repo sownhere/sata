@@ -1,13 +1,13 @@
 """Tests for Story 6.2 pipeline visualization helpers."""
 
-from app.pipeline import (
+from src.core.graph import (
     CONDITIONAL_EDGE_LABELS,
     LINEAR_EDGE_LABELS,
     record_route_transition,
     run_pipeline_node,
 )
-from app.state import initial_state
-from app.utils.pipeline_visualization import (
+from src.core.state import initial_state
+from src.ui.visualization import (
     build_pipeline_graph_dot,
     build_visualization_model,
     get_default_visual_node,

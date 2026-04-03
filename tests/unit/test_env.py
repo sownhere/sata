@@ -1,6 +1,6 @@
 """Tests for startup environment variable validation (AC: 3, 4)."""
 
-from app.utils.env import validate_env, REQUIRED_ENV_VARS
+from src.core.config import REQUIRED_ENV_VARS, validate_env
 
 
 def test_validate_env_returns_all_missing_when_none_set(monkeypatch):

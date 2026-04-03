@@ -2,9 +2,8 @@
 
 import json
 
-from app.utils.spec_gap_detector import detect_spec_gaps
-from app.utils.spec_parser import parse_openapi_spec
-
+from src.tools.gap_detector import detect_spec_gaps
+from src.tools.spec_parser import parse_openapi_spec
 
 GAP_SPEC_JSON = json.dumps(
     {

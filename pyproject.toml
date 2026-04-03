@@ -1,0 +1,32 @@
+[project]
+name = "sata"
+version = "0.1.0"
+description = "AI agent for automated API testing and test-result analysis"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.32.0",
+    "langgraph>=0.1.0",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0.0",
+    "openapi-spec-validator>=0.7.0",
+    "graphviz>=0.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.4.0",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

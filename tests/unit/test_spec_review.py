@@ -1,6 +1,6 @@
 """Tests for deterministic Spec Review formatting helpers."""
 
-from app.utils.spec_review import (
+from src.ui.spec_review import (
     build_endpoint_detail_view,
     build_endpoint_summary_rows,
     get_stage_display_label,
