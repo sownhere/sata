@@ -1,7 +1,6 @@
 """Deterministic formatting helpers for the Spec Review checkpoint.
 
 Canonical location: src.ui.spec_review
-(Migrated from app/utils/spec_review.py — no logic changes.)
 """
 
 from typing import Any, Optional
@@ -68,6 +67,68 @@ def build_endpoint_detail_view(
         "auth": _auth_label(bool(endpoint.get("auth_required")), auth_dict),
         "tags": _tags_summary(endpoint.get("tags")),
     }
+
+
+def build_auth_checkpoint_rows(auth: Optional[dict]) -> list[dict]:
+    """Format top-level auth metadata into deterministic review rows."""
+    if not isinstance(auth, dict):
+        return []
+
+    rows = []
+    field_map = (
+        ("type", "Type"),
+        ("scheme", "Scheme"),
+        ("in", "Location"),
+        ("name", "Name"),
+    )
+    for key, label in field_map:
+        value = auth.get(key)
+        if value is None:
+            continue
+        value_text = str(value).strip()
+        if not value_text:
+            continue
+        rows.append({"field": label, "value": value_text})
+    return rows
+
+
+def should_show_auth_checkpoint(parsed_api_model: dict) -> bool:
+    """Return True when the checkpoint should render an auth section."""
+    auth_rows = build_auth_checkpoint_rows(parsed_api_model.get("auth"))
+    if auth_rows:
+        return True
+
+    endpoints = parsed_api_model.get("endpoints")
+    if not isinstance(endpoints, list):
+        return False
+    return any(
+        isinstance(endpoint, dict) and bool(endpoint.get("auth_required"))
+        for endpoint in endpoints
+    )
+
+
+def build_rejection_return_message(spec_source: Optional[str]) -> str:
+    """Return deterministic copy for the post-rejection return path."""
+    normalized = str(spec_source or "").strip().lower()
+    if normalized == "file":
+        return (
+            "Returning to Spec Ingestion - your uploaded spec source is preserved "
+            "below so you can edit it and re-parse when ready."
+        )
+    if normalized == "url":
+        return (
+            "Returning to Spec Ingestion - your URL import source is preserved for "
+            "reuse, and the fetched spec text is available below for editing."
+        )
+    if normalized == "chat":
+        return (
+            "Returning to Spec Ingestion - your conversation is preserved so you can "
+            "resume refining the API description."
+        )
+    return (
+        "Returning to Spec Ingestion - your previous input is preserved so you can "
+        "revise it and try again."
+    )
 
 
 def _parameter_count_summary(parameters: Any) -> str:

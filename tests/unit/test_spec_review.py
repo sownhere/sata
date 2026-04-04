@@ -1,9 +1,12 @@
 """Tests for deterministic Spec Review formatting helpers."""
 
 from src.ui.spec_review import (
+    build_auth_checkpoint_rows,
     build_endpoint_detail_view,
     build_endpoint_summary_rows,
+    build_rejection_return_message,
     get_stage_display_label,
+    should_show_auth_checkpoint,
 )
 
 
@@ -156,6 +159,54 @@ def test_build_endpoint_detail_view_none_operation_id_and_summary_fallback():
     assert detail["operation_id"] == "-"
     assert detail["summary"] == "No summary provided"
     assert detail["responses"] == []
+
+
+def test_build_auth_checkpoint_rows_formats_bearer_auth_predictably():
+    auth = {
+        "type": "bearer",
+        "scheme": "bearer",
+        "in": "header",
+        "name": "Authorization",
+    }
+
+    rows = build_auth_checkpoint_rows(auth)
+
+    assert rows == [
+        {"field": "Type", "value": "bearer"},
+        {"field": "Scheme", "value": "bearer"},
+        {"field": "Location", "value": "header"},
+        {"field": "Name", "value": "Authorization"},
+    ]
+
+
+def test_build_auth_checkpoint_rows_returns_empty_when_no_auth_details_exist():
+    assert (
+        build_auth_checkpoint_rows(
+            {"type": None, "scheme": None, "in": None, "name": None}
+        )
+        == []
+    )
+
+
+def test_should_show_auth_checkpoint_detects_auth_even_without_top_level_details():
+    parsed_api_model = {
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [
+            {
+                "path": "/secure",
+                "method": "GET",
+                "auth_required": True,
+            }
+        ],
+    }
+
+    assert should_show_auth_checkpoint(parsed_api_model) is True
+
+
+def test_build_rejection_return_message_is_source_specific():
+    assert "uploaded spec source" in build_rejection_return_message("file").lower()
+    assert "url import" in build_rejection_return_message("url").lower()
+    assert "conversation" in build_rejection_return_message("chat").lower()
 
 
 def test_build_endpoint_detail_view_absent_response_schemas_key():

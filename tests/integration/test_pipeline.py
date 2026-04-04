@@ -14,7 +14,8 @@ from src.core.graph import (
 from src.core.state import initial_state
 from src.nodes.detect_gaps import detect_gaps
 from src.nodes.fill_gaps import fill_gaps
-from src.nodes.review_spec import review_spec
+from src.nodes.generate_tests import generate_tests
+from src.nodes.review_spec import prepare_rejection_for_reparse, review_spec
 
 EXPECTED_NODES = [
     "ingest_spec",
@@ -111,6 +112,58 @@ def test_record_route_transition_sets_taken_edge_and_next_active_node():
     assert next_node == "detect_gaps"
     assert state["active_node"] == "detect_gaps"
     assert state["taken_edges"] == [{"source": "parse_spec", "target": "detect_gaps"}]
+
+
+def test_record_route_transition_from_review_spec_uses_confirmation_state():
+    confirmed_state = initial_state()
+    confirmed_state["spec_confirmed"] = True
+
+    confirmed_target = record_route_transition(confirmed_state, "review_spec")
+
+    rejected_state = initial_state()
+    rejected_state["spec_confirmed"] = False
+
+    rejected_target = record_route_transition(rejected_state, "review_spec")
+
+    assert confirmed_target == "generate_tests"
+    assert rejected_target == "ingest_spec"
+
+
+def test_generate_tests_sets_visible_stage_and_clears_stale_error():
+    state = initial_state()
+    state["pipeline_stage"] = "review_spec"
+    state["error_message"] = "stale review error"
+    state["spec_confirmed"] = True
+
+    result = generate_tests(state)
+
+    assert result is state
+    assert result["pipeline_stage"] == "generate_tests"
+    assert result["error_message"] is None
+
+
+def test_prepare_rejection_for_reparse_preserves_raw_spec_and_clears_review_state():
+    state = initial_state()
+    state["spec_source"] = "url"
+    state["raw_spec"] = "openapi: 3.0.0"
+    state["spec_confirmed"] = True
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {"title": "Users API", "endpoints": [{"path": "/x"}]}
+    state["detected_gaps"] = [{"id": "gap-1"}]
+    state["gap_answers"] = {"gap-1": "answer"}
+    state["test_cases"] = [{"id": "should-stay-untouched"}]
+
+    result = prepare_rejection_for_reparse(state)
+
+    assert result is state
+    assert result["spec_source"] == "url"
+    assert result["raw_spec"] == "openapi: 3.0.0"
+    assert result["pipeline_stage"] == "spec_ingestion"
+    assert result["spec_confirmed"] is False
+    assert result["parsed_api_model"] is None
+    assert result["detected_gaps"] is None
+    assert result["gap_answers"] is None
+    assert result["test_cases"] == [{"id": "should-stay-untouched"}]
 
 
 def test_detect_gaps_routes_to_fill_gaps_when_gaps_exist():
