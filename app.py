@@ -24,6 +24,7 @@ from app.utils.env import load_env, validate_env
 from app.utils.spec_editor import add_endpoint, remove_endpoint, update_endpoint_field
 from app.utils.spec_fetcher import fetch_spec_from_url
 from src.core.prompts import load_prompt as _load_prompt
+from src.nodes.review_spec import prepare_rejection_for_reparse
 from src.ui.components import (
     format_gap_answer,
     has_ui_answer,
@@ -31,9 +32,12 @@ from src.ui.components import (
     render_pipeline_visualization,
 )
 from src.ui.spec_review import (
+    build_auth_checkpoint_rows,
     build_endpoint_detail_view,
     build_endpoint_summary_rows,
+    build_rejection_return_message,
     get_stage_display_label,
+    should_show_auth_checkpoint,
 )
 
 # ── Page config ────────────────────────────────────────────────────────────
@@ -65,6 +69,18 @@ if "conversation_messages" not in st.session_state:
 
 if "conversation_banner" not in st.session_state:
     st.session_state.conversation_banner = None
+
+if "ingestion_banner" not in st.session_state:
+    st.session_state.ingestion_banner = None
+
+if "spec_url_input" not in st.session_state:
+    st.session_state.spec_url_input = ""
+
+if "preserved_raw_spec_input" not in st.session_state:
+    st.session_state.preserved_raw_spec_input = ""
+
+if "spec_upload_nonce" not in st.session_state:
+    st.session_state.spec_upload_nonce = 0
 
 # ── Persistent stage header (UX-DR1) ──────────────────────────────────────
 stage = str(st.session_state.state.get("pipeline_stage") or "initial")
@@ -112,6 +128,15 @@ def _reset_conversation_ui() -> None:
         st.session_state.state["conversation_question"] = None
 
 
+def _clear_ingestion_banner() -> None:
+    st.session_state.ingestion_banner = None
+
+
+def _reset_file_uploader_state() -> None:
+    # Rotating the widget key forces Streamlit to drop any previously selected file.
+    st.session_state.spec_upload_nonce += 1
+
+
 def _prime_ingestion_trace(current_state, spec_source: str):
     current_state = reset_visualization_trace(current_state)
     current_state["spec_source"] = spec_source
@@ -145,6 +170,7 @@ def _finalize_parsed_state_after_ingestion(updated_state):
     if not model:
         return updated_state
 
+    _clear_ingestion_banner()
     endpoints = model.get("endpoints") or []
     if len(endpoints) == 0:
         # Zero-endpoint fallback — record the correct route before switching
@@ -174,30 +200,85 @@ if state.get("error_message"):
 render_pipeline_visualization(state)
 
 if current_stage in ("spec_ingestion", "spec_parsed"):
+    if current_stage == "spec_ingestion" and st.session_state.ingestion_banner:
+        st.info(st.session_state.ingestion_banner)
+
     if not state.get("parsed_api_model"):
         st.info(
             "**Next:** Upload your OpenAPI/Swagger spec (JSON or YAML) "
             "or import one from a public URL to begin."
         )
 
-    if st.button("Describe my API manually", use_container_width=False):
-        _reset_conversation_ui()
+    has_saved_conversation = state.get("spec_source") == "chat" and bool(
+        st.session_state.conversation_messages
+    )
+    manual_button_label = (
+        "Resume API conversation"
+        if has_saved_conversation
+        else "Describe my API manually"
+    )
+    if st.button(manual_button_label, use_container_width=False):
+        _clear_ingestion_banner()
+        if not has_saved_conversation:
+            _reset_conversation_ui()
         state["raw_spec"] = None
         state["parsed_api_model"] = None
+        st.session_state.preserved_raw_spec_input = ""
         state = _prime_ingestion_trace(state, "chat")
         state = _start_conversation_flow(state)
         st.session_state.state = state
         st.rerun()
 
+    if current_stage == "spec_ingestion" and state.get("raw_spec"):
+        if not st.session_state.preserved_raw_spec_input:
+            st.session_state.preserved_raw_spec_input = state["raw_spec"]
+
+        st.markdown("### Reuse preserved spec source")
+        st.caption(
+            "Your previous source is preserved here so you can edit it before "
+            "parsing again."
+        )
+        st.text_area(
+            "Preserved spec content",
+            key="preserved_raw_spec_input",
+            height=220,
+        )
+        if st.button("Parse preserved spec source", use_container_width=False):
+            preserved_raw_spec = st.session_state.preserved_raw_spec_input
+            if not preserved_raw_spec.strip():
+                st.error("Preserved spec content is empty.")
+            else:
+                _clear_ingestion_banner()
+                preserved_source = (
+                    state.get("spec_source")
+                    if state.get("spec_source") in {"file", "url"}
+                    else "file"
+                )
+                state = _prime_ingestion_trace(state, preserved_source)
+                state["raw_spec"] = preserved_raw_spec
+                updated_state = run_pipeline_node(state, "parse_spec")
+                if updated_state.get("parsed_api_model"):
+                    updated_state = _finalize_parsed_state_after_ingestion(
+                        updated_state
+                    )
+                elif updated_state.get("error_message"):
+                    updated_state["error_message"] = (
+                        f"Parse error: {updated_state['error_message']}"
+                    )
+                st.session_state.state = updated_state
+                st.rerun()
+
     st.markdown("### Import from URL")
-    spec_url = st.text_input(
+    st.text_input(
         "Public OpenAPI/Swagger URL",
+        key="spec_url_input",
         placeholder="https://example.com/openapi.json",
         help="Enter a public OpenAPI 3.0 JSON or YAML URL.",
     )
     if st.button("Fetch spec from URL", use_container_width=False):
         _reset_conversation_ui()
         state["error_message"] = None
+        spec_url = str(st.session_state.spec_url_input or "")
         if not spec_url.strip():
             state["error_message"] = "Please enter a URL before fetching."
             st.session_state.state = state
@@ -210,6 +291,7 @@ if current_stage in ("spec_ingestion", "spec_parsed"):
                 st.session_state.state = state
                 st.rerun()
             else:
+                _clear_ingestion_banner()
                 state = _prime_ingestion_trace(state, "url")
                 state["raw_spec"] = raw_spec
                 updated_state = run_pipeline_node(state, "parse_spec")
@@ -227,6 +309,7 @@ if current_stage in ("spec_ingestion", "spec_parsed"):
     st.markdown("### Upload file")
     uploaded_file = st.file_uploader(
         "Upload OpenAPI/Swagger spec",
+        key=f"spec_upload_input_{st.session_state.spec_upload_nonce}",
         type=["json", "yaml", "yml"],
         help="Supports OpenAPI 3.0 in JSON or YAML format",
     )
@@ -243,6 +326,7 @@ if current_stage in ("spec_ingestion", "spec_parsed"):
             st.session_state.state = state
             st.rerun()
         else:
+            _clear_ingestion_banner()
             state = _prime_ingestion_trace(state, "file")
             state["raw_spec"] = raw_spec
             updated_state = run_pipeline_node(state, "parse_spec")
@@ -352,12 +436,64 @@ elif current_stage == "review_spec":
     top_level_auth = model.get("auth") or {}
     endpoint_count = len(endpoints)
     plural = "s" if endpoint_count != 1 else ""
-
-    # Confirm / Re-parse UI not implemented yet (planned checkpoint).
     st.info(
-        "**Next required action:** Review and edit your API spec below. "
-        "Buttons to confirm the spec or reject and re-parse are not available yet."
+        "**Next required action:** Review your API spec below, then choose "
+        "**Confirm Spec** to continue or **Reject & Re-parse** to return "
+        "to Spec Ingestion."
     )
+
+    st.markdown("### Checkpoint 1: Confirm or Reject Spec")
+    confirm_col, reject_col = st.columns(2)
+    confirm_clicked = confirm_col.button(
+        "Confirm Spec",
+        use_container_width=True,
+        disabled=endpoint_count == 0,
+    )
+    reject_clicked = reject_col.button(
+        "Reject & Re-parse",
+        use_container_width=True,
+        disabled=endpoint_count == 0,
+    )
+
+    if should_show_auth_checkpoint(model):
+        st.markdown("#### Auth Configuration")
+        auth_rows = build_auth_checkpoint_rows(top_level_auth)
+        if auth_rows:
+            st.dataframe(auth_rows, use_container_width=True)
+        else:
+            st.caption(
+                "One or more endpoints require authentication, but detailed "
+                "auth metadata is unavailable in the parsed model."
+            )
+        st.warning(
+            "These credentials will be sent only to your target API - never to the LLM."
+        )
+
+    if confirm_clicked:
+        _clear_ingestion_banner()
+        state["spec_confirmed"] = True
+        state["error_message"] = None
+        record_route_transition(state, "review_spec", target_override="generate_tests")
+        updated_state = run_pipeline_node(state, "generate_tests")
+        st.session_state.state = updated_state
+        st.rerun()
+
+    if reject_clicked:
+        st.session_state.ingestion_banner = build_rejection_return_message(
+            state.get("spec_source")
+        )
+        _reset_file_uploader_state()
+        if state.get("raw_spec"):
+            st.session_state.preserved_raw_spec_input = state["raw_spec"]
+        updated_state = prepare_rejection_for_reparse(state)
+        record_route_transition(
+            updated_state,
+            "review_spec",
+            target_override="ingest_spec",
+        )
+        updated_state = run_pipeline_node(updated_state, "ingest_spec")
+        st.session_state.state = updated_state
+        st.rerun()
 
     # API summary banner
     st.markdown(
@@ -477,3 +613,11 @@ elif current_stage == "review_spec":
             for gap_id, answer in state["gap_answers"].items()
         )
         st.code(answers_text, language=None)
+
+elif current_stage == "generate_tests":
+    st.success("Spec confirmed.")
+    st.info(
+        "**Next required action:** Story 3.1 will implement actual test "
+        "generation. This placeholder stage confirms that Checkpoint 1 "
+        "advanced successfully."
+    )
