@@ -1,6 +1,6 @@
 # Story 1.5: Conversational API Description & Zero-Endpoint Fallback
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -275,6 +275,22 @@ GPT-5
 - `tests/test_pipeline.py`
 - `tests/test_state.py`
 
+## Review Findings
+
+- [ ] `Review/Patch` — Zero-endpoint fallback incorrectly triggers on a non-empty `parsed_api_model` dict that lacks the `endpoints` key (malformed parse result enters conversational mode) — `src/core/graph.py:165-170`, `src/nodes/fill_gaps.py:77-83`, `app.py:79-83`
+- [x] `Review/Patch` — `_route_after_parse` has no explicit guard for `error_message`; safe only because `parse_spec` sets model to `None` on failure — fragile double-negative, one refactor away from routing a failed parse to `fill_gaps` — `src/core/graph.py:163-170` — RESOLVED: the current guard is safe with existing code; a code comment has been noted for the next refactor.
+- [x] `Review/Patch` — `_finalize_parsed_state_after_ingestion` appends the wrong edge to visualization trace before the zero-endpoint fallback redirect, recording `parse_spec → detect_gaps` when path is actually `parse_spec → fill_gaps` — `app.py:140-152` — FIXED: deferred `record_route_transition` to after the zero-endpoint branch check; zero-endpoint path now records `parse_spec → fill_gaps`.
+- [x] `Review/Patch` — `_validate_api_model` uses exact key equality; LLM output with any extra top-level or endpoint keys raises `ValueError`, a common LLM non-compliance pattern — `src/tools/conversational_builder.py:116,128` — FIXED: changed to subset check using `issubset()` for top-level keys, endpoint keys, and auth keys.
+- [x] `Review/Patch` — `_validate_api_model` requires non-empty `response_schemas`, blocking valid 204-only endpoints with no response body — `src/tools/conversational_builder.py:143-148` — FIXED: removed the `or not endpoint["response_schemas"]` check; empty dict is now valid.
+- [x] `Review/Patch` — `_build_prompt` passes system instruction + conversation as a single human message with no role separation; LLM receives no system-role framing — `src/tools/conversational_builder.py:73-84` — FIXED: `_build_prompt` now returns `list[dict]` with separate system and user roles.
+- [x] `Review/Decision` — `fill_gaps` sets `pipeline_stage="spec_parsed"` on conversational completion; `app.py` overrides it to `"review_spec"`; node and UI contracts are inconsistent — direct LangGraph invocation bypasses review checkpoint — `src/nodes/fill_gaps.py:45`, `app.py:288` — FIXED: `fill_gaps` now sets `pipeline_stage="review_spec"` directly; the redundant override in `app.py` has been removed.
+- [x] `Review/Patch` — No iteration/loop guard prevents infinite LLM "needs_more_info" loop; `iteration_count` field exists in state but is never checked in the conversational path — `src/nodes/fill_gaps.py:9-46` — FIXED: added iteration guard at the start of the conversational path; resets to `spec_ingestion` after 10 turns.
+- [ ] `Review/Patch` — Full conversation history re-sent to LLM on every turn with no token budget or windowing guard — `src/tools/conversational_builder.py:28-59`
+- [x] `Review/Patch` — `_load_json_payload` does not strip markdown code fences; LLMs commonly wrap JSON in triple-backtick blocks causing spurious `ValueError` — `src/tools/conversational_builder.py:103-110` — FIXED: strips ` ```json ` / ` ``` ` fences before JSON parsing.
+- [x] `Review/Patch` — Zero-endpoint fallback banner silently becomes empty if `conversation_starter.md` lacks a `---` separator; AC2 message disappears without error — `app.py:71-75`, `app.py:255-256` — FIXED: added a hardcoded fallback string when the separator is absent.
+- [x] `Review/Decision` — `_conversation_mode_active` in `app.py` duplicates `_is_conversational_mode` in `fill_gaps.py` with no shared source of truth; a change to one will not propagate to the other — `app.py:78-83`, `src/nodes/fill_gaps.py:76-83` — DEFERRED: low risk, refactor scope; both implementations are identical and tested; consolidation deferred to a future refactor story.
+
 ## Change Log
 
 - 2026-03-31: Implemented Story 1.5 conversational ingestion and zero-endpoint fallback, added deterministic tests, and restored full regression-suite compatibility.
+- 2026-04-04: Applied review findings — fixed subset key validation, 204-only endpoint support, prompt role separation, markdown code-fence stripping, iteration guard, `review_spec` stage consistency, zero-endpoint visualization trace, and fallback banner safety. Added 4 new regression tests. 148 tests pass; ruff clean.

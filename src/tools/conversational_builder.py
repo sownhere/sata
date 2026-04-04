@@ -70,7 +70,7 @@ def _build_llm():
     )
 
 
-def _build_prompt(messages: list[dict]) -> str:
+def _build_prompt(messages: list[dict]) -> list[dict]:
     transcript_lines = []
     for message in messages:
         role = str(message.get("role", "user")).strip().lower() or "user"
@@ -78,10 +78,12 @@ def _build_prompt(messages: list[dict]) -> str:
         if not content:
             continue
         transcript_lines.append(f"{role.upper()}: {content}")
-
     transcript = "\n".join(transcript_lines)
     system_prompt = load_prompt("conversational_extraction")
-    return f"{system_prompt}\n\nConversation:\n{transcript}"
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Conversation so far:\n{transcript}"},
+    ]
 
 
 def _response_text(response) -> str:
@@ -101,8 +103,16 @@ def _response_text(response) -> str:
 
 
 def _load_json_payload(text: str) -> dict:
+    stripped = text.strip()
+    # Strip markdown code fences if present
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        # Remove first line (```json or ```) and last line (```)
+        if lines[-1].strip() == "```":
+            lines = lines[1:-1]
+        stripped = "\n".join(lines)
     try:
-        payload = json.loads(text)
+        payload = json.loads(stripped)
     except json.JSONDecodeError as exc:
         raise ValueError("Conversation extraction must return valid JSON.") from exc
     if not isinstance(payload, dict):
@@ -113,7 +123,7 @@ def _load_json_payload(text: str) -> dict:
 def _validate_api_model(api_model) -> None:
     if not isinstance(api_model, dict):
         raise ValueError("Conversation extraction must return an api_model object.")
-    if set(api_model.keys()) != EXPECTED_TOP_LEVEL_KEYS:
+    if not EXPECTED_TOP_LEVEL_KEYS.issubset(set(api_model.keys())):
         raise ValueError("Conversation extraction returned an invalid API model shape.")
 
     endpoints = api_model.get("endpoints")
@@ -125,7 +135,7 @@ def _validate_api_model(api_model) -> None:
             raise ValueError(
                 "Conversation extraction returned an invalid endpoint record."
             )
-        if set(endpoint.keys()) != EXPECTED_ENDPOINT_KEYS:
+        if not EXPECTED_ENDPOINT_KEYS.issubset(set(endpoint.keys())):
             raise ValueError(
                 "Conversation extraction returned an invalid endpoint shape."
             )
@@ -138,12 +148,9 @@ def _validate_api_model(api_model) -> None:
             raise ValueError("Each extracted endpoint must include a method.")
         if not isinstance(endpoint.get("parameters"), list):
             raise ValueError("Each extracted endpoint must include a parameters list.")
-        if (
-            not isinstance(endpoint.get("response_schemas"), dict)
-            or not endpoint["response_schemas"]
-        ):
+        if not isinstance(endpoint.get("response_schemas"), dict):
             raise ValueError(
-                "Each extracted endpoint must include at least one response schema."
+                "Each extracted endpoint must include a response_schemas dict."
             )
         if not isinstance(endpoint.get("tags"), list):
             raise ValueError("Each extracted endpoint must include a tags list.")
@@ -153,7 +160,7 @@ def _validate_api_model(api_model) -> None:
             )
 
     auth = api_model.get("auth")
-    if not isinstance(auth, dict) or set(auth.keys()) != EXPECTED_AUTH_KEYS:
+    if not isinstance(auth, dict) or not EXPECTED_AUTH_KEYS.issubset(set(auth.keys())):
         raise ValueError("Conversation extraction returned an invalid auth shape.")
     if not isinstance(api_model.get("title"), str) or not api_model["title"].strip():
         raise ValueError("Conversation extraction must include an API title.")

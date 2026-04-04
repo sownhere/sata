@@ -496,7 +496,7 @@ def test_fill_gaps_extracts_api_model_for_manual_conversation(monkeypatch):
 
     result = fill_gaps(state)
 
-    assert result["pipeline_stage"] == "spec_parsed"
+    assert result["pipeline_stage"] == "review_spec"
     assert result["parsed_api_model"]["title"] == "Users API"
     assert result["conversation_question"] is None
 
@@ -524,6 +524,54 @@ def test_fill_gaps_records_follow_up_question_for_manual_conversation(monkeypatc
     assert result["pipeline_stage"] == "fill_gaps"
     assert result["conversation_question"] == "What does POST /users return on success?"
     assert result["parsed_api_model"] is None
+
+
+def test_fill_gaps_updates_parsed_api_model_for_missing_success_response_answer():
+    """AC3: fill_gaps must persist a missing_success_response answer into
+    parsed_api_model so downstream nodes see the user-provided schema."""
+    state = initial_state()
+    state["parsed_api_model"] = {
+        "title": "Gap API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [
+            {
+                "path": "/users",
+                "method": "POST",
+                "operation_id": None,
+                "summary": None,
+                "parameters": [],
+                "request_body": None,
+                "response_schemas": {},
+                "auth_required": False,
+                "tags": [],
+            }
+        ],
+    }
+    state["detected_gaps"] = [
+        {
+            "id": "post-users-missing-success-response",
+            "endpoint_key": "POST /users",
+            "path": "/users",
+            "method": "POST",
+            "gap_type": "missing_success_response",
+            "field": "response_schemas.2xx",
+            "question": "What does a successful response return?",
+            "input_type": "text_area",
+            "options": None,
+        }
+    ]
+    state["gap_answers"] = {
+        "post-users-missing-success-response": "Returns the created user object."
+    }
+    state["pipeline_stage"] = "fill_gaps"
+
+    result = fill_gaps(state)
+
+    assert result["pipeline_stage"] == "review_spec"
+    assert result["detected_gaps"] == []
+    endpoint = result["parsed_api_model"]["endpoints"][0]
+    assert endpoint["response_schemas"]["200"] == "Returns the created user object."
 
 
 def test_review_spec_is_not_a_passthrough_stub_for_empty_models():

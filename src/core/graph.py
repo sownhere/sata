@@ -112,7 +112,9 @@ LINEAR_EDGE_LABELS = {
 
 PIPELINE_STAGE_TO_NODE = {
     "spec_ingestion": "ingest_spec",
+    "ingest_spec": "ingest_spec",
     "spec_parsed": "parse_spec",
+    "detect_gaps": "detect_gaps",
     "fill_gaps": "fill_gaps",
     "review_spec": "review_spec",
     "generate_tests": "generate_tests",
@@ -253,7 +255,9 @@ def record_route_transition(
 
 def _append_taken_edge(state: SataState, source: str, target: str) -> None:
     taken_edges = list(state.get("taken_edges") or [])
-    taken_edges.append({"source": source, "target": target})
+    entry = {"source": source, "target": target}
+    if entry not in taken_edges:
+        taken_edges.append(entry)
     state["taken_edges"] = taken_edges
 
 

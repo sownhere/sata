@@ -4,7 +4,7 @@ Canonical location: src.ui.spec_review
 (Migrated from app/utils/spec_review.py — no logic changes.)
 """
 
-from typing import Any
+from typing import Any, Optional
 
 
 def get_stage_display_label(stage: str) -> str:
@@ -45,8 +45,13 @@ def build_endpoint_summary_rows(parsed_api_model: dict) -> list[dict]:
     return rows
 
 
-def build_endpoint_detail_view(endpoint: dict) -> dict:
+def build_endpoint_detail_view(
+    endpoint: dict, *, top_level_auth: Optional[dict] = None
+) -> dict:
     """Format one endpoint into deterministic detail fields for the review UI."""
+    if not isinstance(endpoint, dict):
+        return {}
+    auth_dict = top_level_auth if isinstance(top_level_auth, dict) else {}
     parameters = _parameter_rows(endpoint.get("parameters"))
     return {
         "heading": (
@@ -60,7 +65,7 @@ def build_endpoint_detail_view(endpoint: dict) -> dict:
         "parameters": parameters,
         "request_body_summary": _request_body_summary(endpoint.get("request_body")),
         "responses": _response_rows(endpoint.get("response_schemas")),
-        "auth": _auth_label(bool(endpoint.get("auth_required")), {}),
+        "auth": _auth_label(bool(endpoint.get("auth_required")), auth_dict),
         "tags": _tags_summary(endpoint.get("tags")),
     }
 
@@ -93,7 +98,7 @@ def _parameter_rows(parameters: Any) -> list[dict]:
 
 
 def _request_body_summary(request_body: Any) -> str:
-    if request_body is None:
+    if not request_body:  # None or empty dict/list
         return "No request body"
     return _schema_summary(request_body)
 

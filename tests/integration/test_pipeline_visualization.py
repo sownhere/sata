@@ -1,8 +1,12 @@
 """Tests for Story 6.2 pipeline visualization helpers."""
 
+from langgraph.graph import END
+
 from src.core.graph import (
     CONDITIONAL_EDGE_LABELS,
     LINEAR_EDGE_LABELS,
+    PIPELINE_STAGE_TO_NODE,
+    _append_taken_edge,
     record_route_transition,
     run_pipeline_node,
 )
@@ -108,3 +112,35 @@ def test_get_node_detail_returns_role_metadata():
 
     assert detail["label"] == "Execute Tests"
     assert "auth" in detail["role"].lower()
+
+
+def test_append_taken_edge_deduplicates():
+    """Appending the same edge twice should only record it once."""
+    state = initial_state()
+    _append_taken_edge(state, "parse_spec", "detect_gaps")
+    _append_taken_edge(state, "parse_spec", "detect_gaps")
+    taken = state["taken_edges"]
+    assert taken.count({"source": "parse_spec", "target": "detect_gaps"}) == 1
+    assert len(taken) == 1
+
+
+def test_get_default_visual_node_respects_selected_visual_node_over_active():
+    """selected_visual_node must take priority over active_node."""
+    state = initial_state()
+    state["selected_visual_node"] = "fill_gaps"
+    state["active_node"] = "parse_spec"
+    assert get_default_visual_node(state) == "fill_gaps"
+
+
+def test_build_visualization_model_excludes_end_node():
+    """build_visualization_model must not emit any edge whose target is END."""
+    state = initial_state()
+    model = build_visualization_model(state)
+    end_targets = [edge for edge in model["edges"] if edge["target"] == END]
+    assert end_targets == [], f"Expected no edges targeting END, found: {end_targets}"
+
+
+def test_pipeline_stage_to_node_contains_detect_gaps_and_ingest_spec():
+    """PIPELINE_STAGE_TO_NODE must map 'detect_gaps' and 'ingest_spec'."""
+    assert PIPELINE_STAGE_TO_NODE.get("detect_gaps") == "detect_gaps"
+    assert PIPELINE_STAGE_TO_NODE.get("ingest_spec") == "ingest_spec"
