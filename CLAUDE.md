@@ -9,21 +9,21 @@ AI agent for automated API testing and test-result analysis. It ingests API spec
 ## Commands
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (uv manages the virtualenv automatically)
+uv sync --extra dev
 
 # Run the app
-streamlit run app.py
+uv run streamlit run app.py
 
 # Run all tests
-pytest tests/ --tb=short -q
+uv run pytest tests/ --tb=short -q
 
 # Run a single test file
-pytest tests/test_spec_parser.py --tb=short -q
+uv run pytest tests/test_spec_parser.py --tb=short -q
 
 # Lint
-ruff check app/ tests/ app.py
-ruff format --check app/ tests/ app.py
+uvx ruff check app/ tests/ app.py src/
+uvx ruff format --check app/ tests/ app.py src/
 ```
 
 ## Environment

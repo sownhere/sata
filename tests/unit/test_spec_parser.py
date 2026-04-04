@@ -1,14 +1,14 @@
-"""Tests for app.utils.spec_parser — OpenAPI/Swagger parsing logic.
+"""Tests for src.tools.spec_parser — OpenAPI/Swagger parsing logic.
 
 Covers: valid JSON parse, valid YAML parse, malformed input, missing paths key,
 missing openapi field, non-3.x version, multiple endpoints, auth extraction.
 """
 
 import json
+
 import pytest
 
-from app.utils.spec_parser import parse_openapi_spec
-
+from src.tools.spec_parser import parse_openapi_spec
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 

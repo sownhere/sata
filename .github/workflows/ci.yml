@@ -19,13 +19,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.11"
-
-      - name: Install ruff
-        run: pip install ruff
 
       - name: Lint with ruff
         run: |
@@ -33,7 +30,7 @@ jobs:
           if [ -z "$py_files" ]; then
             echo "No Python source files found — skipping"
           else
-            printf '%s\n' "$py_files" | xargs ruff check
+            printf '%s\n' "$py_files" | xargs uvx ruff check
           fi
 
       - name: Check formatting with ruff
@@ -42,7 +39,7 @@ jobs:
           if [ -z "$py_files" ]; then
             echo "No Python source files found — skipping"
           else
-            printf '%s\n' "$py_files" | xargs ruff format --check
+            printf '%s\n' "$py_files" | xargs uvx ruff format --check
           fi
 
       - name: Enforce single commit on PR branch
@@ -82,27 +79,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
-            pip install -e ".[dev]"
-          elif [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-          else
-            echo "No dependencies file found — skipping"
-          fi
+        run: uv sync --extra dev
 
       - name: Run tests
         run: |
           if [ -d "tests" ]; then
-            pip install pytest pytest-cov
-            pytest tests/ --tb=short -q
+            uv run pytest tests/ --tb=short -q
           else
             echo "No tests directory found — skipping"
           fi
@@ -114,27 +102,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
-            pip install -e ".[dev]"
-          elif [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-          else
-            echo "No dependencies file found — skipping"
-          fi
+        run: uv sync --extra dev
 
       - name: Syntax check
         run: |
-          py_files=$(git ls-files --cached --others --exclude-standard -- '*.py')
+          py_files=$(git ls-files --cached --others --exclude-standard -- '*.py' ':(exclude)_bmad/**' ':(exclude).agents/**' ':(exclude).claude/**' ':(exclude).cursor/**')
           if [ -z "$py_files" ]; then
             echo "No Python source files found — skipping"
           else
-            printf '%s\n' "$py_files" | xargs python -m py_compile
+            printf '%s\n' "$py_files" | xargs uv run python -m py_compile
           fi

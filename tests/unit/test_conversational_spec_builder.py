@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from app.utils.conversational_spec_builder import (
+from src.tools.conversational_builder import (
     extract_api_model_from_conversation,
 )
 
@@ -26,7 +26,10 @@ VALID_CONVERSATION = [
     },
     {
         "role": "user",
-        "content": "I have GET /users and POST /users. GET returns a list. POST accepts name and returns 201 with a user object. No auth.",
+        "content": (
+            "I have GET /users and POST /users. GET returns a list."
+            " POST accepts name and returns 201 with a user object. No auth."
+        ),
     },
 ]
 

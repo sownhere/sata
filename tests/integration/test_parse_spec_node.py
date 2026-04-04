@@ -6,9 +6,8 @@ Validates NFR2: node failures must not crash pipeline (never raises).
 
 import json
 
-from app.pipeline import parse_spec
-from app.state import initial_state
-
+from src.core.state import initial_state
+from src.nodes.parse_spec import parse_spec
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 

@@ -1,18 +1,20 @@
 """Tests for LangGraph pipeline behavior and graph wiring."""
 
-from app.pipeline import (
+import sys
+
+from src.core.graph import (
     CONDITIONAL_EDGE_LABELS,
     LINEAR_EDGE_LABELS,
     _route_after_ingest,
     _route_after_parse,
     build_pipeline,
-    detect_gaps,
-    fill_gaps,
     record_route_transition,
-    review_spec,
     run_pipeline_node,
 )
-from app.state import initial_state
+from src.core.state import initial_state
+from src.nodes.detect_gaps import detect_gaps
+from src.nodes.fill_gaps import fill_gaps
+from src.nodes.review_spec import review_spec
 
 EXPECTED_NODES = [
     "ingest_spec",
@@ -62,7 +64,7 @@ def test_pipeline_route_labels_cover_every_conditional_edge():
     conditional_edges = {
         (edge.source, edge.target)
         for edge in graph.get_graph().edges
-        if edge.conditional and not edge.target.startswith("__")
+        if edge.conditional
     }
 
     assert conditional_edges == set(CONDITIONAL_EDGE_LABELS)
@@ -467,7 +469,8 @@ def test_fill_gaps_extracts_api_model_for_manual_conversation(monkeypatch):
     state["pipeline_stage"] = "fill_gaps"
 
     monkeypatch.setattr(
-        "app.pipeline.extract_api_model_from_conversation",
+        sys.modules["src.nodes.fill_gaps"],
+        "extract_api_model_from_conversation",
         lambda messages: {
             "status": "complete",
             "api_model": {
@@ -508,7 +511,8 @@ def test_fill_gaps_records_follow_up_question_for_manual_conversation(monkeypatc
     state["pipeline_stage"] = "fill_gaps"
 
     monkeypatch.setattr(
-        "app.pipeline.extract_api_model_from_conversation",
+        sys.modules["src.nodes.fill_gaps"],
+        "extract_api_model_from_conversation",
         lambda messages: {
             "status": "needs_more_info",
             "question": "What does POST /users return on success?",

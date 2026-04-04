@@ -1,7 +1,7 @@
 """Tests for the review_spec pipeline node in app/pipeline.py."""
 
-from app.pipeline import review_spec
-from app.state import initial_state
+from src.core.state import initial_state
+from src.nodes.review_spec import review_spec
 
 
 def test_review_spec_sets_stage_when_endpoints_exist():
