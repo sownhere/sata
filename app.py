@@ -21,6 +21,7 @@ from app.pipeline import (
 )
 from app.state import initial_state
 from app.utils.env import load_env, validate_env
+from app.utils.spec_editor import add_endpoint, remove_endpoint, update_endpoint_field
 from app.utils.spec_fetcher import fetch_spec_from_url
 from src.core.prompts import load_prompt as _load_prompt
 from src.ui.components import (
@@ -337,16 +338,25 @@ elif current_stage == "fill_gaps":
             st.rerun()
 
 elif current_stage == "review_spec":
+    _HTTP_METHODS = (
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+    )
     model = state.get("parsed_api_model") or {}
     endpoints = model.get("endpoints") or []
     top_level_auth = model.get("auth") or {}
     endpoint_count = len(endpoints)
     plural = "s" if endpoint_count != 1 else ""
 
-    # AC1: next-action copy (UX-DR2)
+    # Confirm / Re-parse UI not implemented yet (planned checkpoint).
     st.info(
-        "**Next required action:** Review your API spec below — "
-        "confirm to proceed or reject to re-parse."
+        "**Next required action:** Review and edit your API spec below. "
+        "Buttons to confirm the spec or reject and re-parse are not available yet."
     )
 
     # API summary banner
@@ -355,13 +365,15 @@ elif current_stage == "review_spec":
         f" · {endpoint_count} endpoint{plural}"
     )
 
-    # AC2: endpoint summary table
+    # AC2: endpoint summary table (read-only, above edit forms)
     rows = build_endpoint_summary_rows(model)
     if rows:
         st.dataframe(rows, use_container_width=True)
+    elif endpoint_count == 0:
+        st.info("No endpoints in this spec. Use **+ Add endpoint** below to add one.")
 
-    # AC2: per-endpoint detail expanders
-    for endpoint in endpoints:
+    # AC2: per-endpoint detail expanders + edit / remove (Story 2.2)
+    for i, endpoint in enumerate(endpoints):
         if not isinstance(endpoint, dict):
             continue
         detail = build_endpoint_detail_view(endpoint, top_level_auth=top_level_auth)
@@ -379,6 +391,83 @@ elif current_stage == "review_spec":
                 st.dataframe(detail["responses"], use_container_width=True)
             else:
                 st.markdown("**Responses:** No responses documented")
+
+            if st.button(f"Remove endpoint {i}", key=f"btn_remove_{i}"):
+                new_model = remove_endpoint(model, i)
+                st.session_state.state["parsed_api_model"] = new_model
+                st.rerun()
+
+            _meth = str(endpoint.get("method") or "GET").upper()
+            _meth_idx = _HTTP_METHODS.index(_meth) if _meth in _HTTP_METHODS else 0
+            with st.form(f"form_edit_{i}"):
+                st.markdown("##### Edit endpoint")
+                edit_path = st.text_input(
+                    "Path",
+                    value=str(endpoint.get("path") or ""),
+                )
+                edit_method = st.selectbox(
+                    "Method",
+                    _HTTP_METHODS,
+                    index=_meth_idx,
+                )
+                edit_summary = st.text_input(
+                    "Summary",
+                    value=str(endpoint.get("summary") or ""),
+                )
+                edit_op_id = st.text_input(
+                    "Operation ID",
+                    value=str(endpoint.get("operation_id") or ""),
+                )
+                save = st.form_submit_button("Save changes")
+            if save:
+                new_model = model
+                if edit_path != str(endpoint.get("path") or ""):
+                    new_model = update_endpoint_field(new_model, i, "path", edit_path)
+                _old_method = str(endpoint.get("method") or "").strip().upper()
+                if edit_method != _old_method:
+                    new_model = update_endpoint_field(
+                        new_model, i, "method", edit_method
+                    )
+                if edit_summary != str(endpoint.get("summary") or ""):
+                    new_model = update_endpoint_field(
+                        new_model, i, "summary", edit_summary
+                    )
+                if edit_op_id != str(endpoint.get("operation_id") or ""):
+                    new_model = update_endpoint_field(
+                        new_model, i, "operation_id", edit_op_id
+                    )
+                if new_model is not model:
+                    st.session_state.state["parsed_api_model"] = new_model
+                    st.rerun()
+
+    with st.expander("+ Add endpoint", expanded=False):
+        with st.form("form_add_endpoint"):
+            add_path = st.text_input("Path (required)")
+            add_method = st.selectbox("Method (required)", _HTTP_METHODS)
+            add_summary = st.text_input("Summary (optional)", value="")
+            add_op_id = st.text_input("Operation ID (optional)", value="")
+            add_submitted = st.form_submit_button("Add endpoint")
+        if add_submitted:
+            if not str(add_path or "").strip():
+                st.error("Path is required.")
+            else:
+                try:
+                    new_ep = {
+                        "path": str(add_path).strip(),
+                        "method": str(add_method).strip(),
+                        "operation_id": str(add_op_id or "").strip(),
+                        "summary": str(add_summary or "").strip(),
+                        "parameters": [],
+                        "request_body": None,
+                        "response_schemas": {},
+                        "auth_required": False,
+                        "tags": [],
+                    }
+                    new_model = add_endpoint(model, new_ep)
+                    st.session_state.state["parsed_api_model"] = new_model
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
 
     # Clarifications captured — use code block to prevent markdown injection
     if state.get("gap_answers"):

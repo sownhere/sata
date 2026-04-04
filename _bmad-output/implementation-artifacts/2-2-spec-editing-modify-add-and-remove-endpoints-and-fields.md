@@ -1,6 +1,6 @@
 # Story 2.2: Spec Editing — Modify, Add & Remove Endpoints and Fields
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -14,7 +14,7 @@ So that I can correct parser errors or fill in details before committing to test
 
 1. **Given** the spec review panel is displayed, **when** the developer clicks to edit a field (e.g., a parameter type or response schema), **then** the field becomes editable inline **and** changes are immediately reflected in `SataState` on save.
 
-2. **Given** the developer wants to add a new endpoint, **when** they use the "Add endpoint" action, **then** a form appears requesting: path, method, parameters, and optional schema fields **and** the new endpoint is appended to the spec in `SataState`.
+2. **Given** the developer wants to add a new endpoint, **when** they use the "Add endpoint" action, **then** a form appears requesting path, method, and optional summary and operation id **and** the new endpoint is appended in the Story 1.2 canonical shape (including empty `parameters`, null `request_body`, and empty `response_schemas`) **and** it is stored in `SataState`.
 
 3. **Given** the developer wants to remove an endpoint, **when** they trigger the remove action on an endpoint row, **then** the endpoint is removed from the display and from `SataState` **and** no other endpoints are affected.
 
@@ -22,25 +22,25 @@ So that I can correct parser errors or fill in details before committing to test
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add spec-mutation helpers to `app/utils/spec_editor.py` (AC: 1, 2, 3)
-  - [ ] Implement `update_endpoint_field(parsed_api_model: dict, endpoint_index: int, field: str, value) -> dict` — returns a new dict with the field updated; does not mutate in place
-  - [ ] Implement `add_endpoint(parsed_api_model: dict, new_endpoint: dict) -> dict` — appends a valid endpoint dict to the endpoints list; validates required keys (`path`, `method`) before appending; raises `ValueError` for missing required fields
-  - [ ] Implement `remove_endpoint(parsed_api_model: dict, endpoint_index: int) -> dict` — removes the endpoint at the given index; no-op if index is out of range
-  - [ ] Keep all helpers pure (no Streamlit imports, no side effects); return a new `parsed_api_model` dict each time
-  - [ ] Do NOT modify `app/utils/spec_review.py` — that module is display-only
+- [x] Task 1: Add spec-mutation helpers to `app/utils/spec_editor.py` (AC: 1, 2, 3)
+  - [x] Implement `update_endpoint_field(parsed_api_model: dict, endpoint_index: int, field: str, value) -> dict` — returns a new dict with the field updated; does not mutate in place
+  - [x] Implement `add_endpoint(parsed_api_model: dict, new_endpoint: dict) -> dict` — appends a valid endpoint dict to the endpoints list; validates required keys (`path`, `method`) before appending; raises `ValueError` for missing required fields
+  - [x] Implement `remove_endpoint(parsed_api_model: dict, endpoint_index: int) -> dict` — removes the endpoint at the given index; no-op if index is out of range
+  - [x] Keep all helpers pure (no Streamlit imports, no side effects); return a new `parsed_api_model` dict each time
+  - [x] Do NOT modify `app/utils/spec_review.py` — that module is display-only
 
-- [ ] Task 2: Add inline edit controls to the Spec Review panel in `app.py` (AC: 1, 4)
-  - [ ] Wrap existing endpoint detail expanders (from Story 2.1) with per-endpoint edit forms using `st.form` keyed by endpoint index (e.g., `form_edit_{i}`)
-  - [ ] Expose editable fields within the form: `path` (text), `method` (selectbox: GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS), `summary` (text), `operation_id` (text)
-  - [ ] On form submit ("Save changes"), call `update_endpoint_field` for each changed field, write the resulting model back to `st.session_state.state["parsed_api_model"]`, then `st.rerun()`
-  - [ ] Do NOT expose parameter-level or schema-level sub-editing in this story — endpoint-level fields only
-  - [ ] Keep the read-only summary table (from Story 2.1) above the edit forms so the developer can see all endpoints at a glance
+- [x] Task 2: Add inline edit controls to the Spec Review panel in `app.py` (AC: 1, 4)
+  - [x] Wrap existing endpoint detail expanders (from Story 2.1) with per-endpoint edit forms using `st.form` keyed by endpoint index (e.g., `form_edit_{i}`)
+  - [x] Expose editable fields within the form: `path` (text), `method` (selectbox: GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS), `summary` (text), `operation_id` (text)
+  - [x] On form submit ("Save changes"), call `update_endpoint_field` for each changed field, write the resulting model back to `st.session_state.state["parsed_api_model"]`, then `st.rerun()`
+  - [x] Do NOT expose parameter-level or schema-level sub-editing in this story — endpoint-level fields only
+  - [x] Keep the read-only summary table (from Story 2.1) above the edit forms so the developer can see all endpoints at a glance
 
-- [ ] Task 3: Add "Add endpoint" form in `app.py` (AC: 2, 4)
-  - [ ] Render a collapsible "Add endpoint" section below the endpoint list (use `st.expander("+ Add endpoint", expanded=False)`)
-  - [ ] Inside the expander, use a single `st.form("form_add_endpoint")` with fields: path (text, required), method (selectbox, required), summary (text, optional), operation_id (text, optional)
-  - [ ] On form submit ("Add endpoint"), call `add_endpoint(...)` with the minimal canonical endpoint shape, write result to `st.session_state.state["parsed_api_model"]`, then `st.rerun()`
-  - [ ] The minimal canonical shape for a new endpoint must match the Story 1.2 contract:
+- [x] Task 3: Add "Add endpoint" form in `app.py` (AC: 2, 4)
+  - [x] Render a collapsible "Add endpoint" section below the endpoint list (use `st.expander("+ Add endpoint", expanded=False)`)
+  - [x] Inside the expander, use a single `st.form("form_add_endpoint")` with fields: path (text, required), method (selectbox, required), summary (text, optional), operation_id (text, optional)
+  - [x] On form submit ("Add endpoint"), call `add_endpoint(...)` with the minimal canonical endpoint shape, write result to `st.session_state.state["parsed_api_model"]`, then `st.rerun()`
+  - [x] The minimal canonical shape for a new endpoint must match the Story 1.2 contract:
     ```python
     {
         "path": path,
@@ -54,20 +54,28 @@ So that I can correct parser errors or fill in details before committing to test
         "tags": [],
     }
     ```
-  - [ ] Show a validation error via `st.error(...)` if path or method is empty — do not submit the form
+  - [x] Show a validation error via `st.error(...)` if path or method is empty — do not submit the form
 
-- [ ] Task 4: Add "Remove endpoint" button per endpoint in `app.py` (AC: 3, 4)
-  - [ ] Add a "Remove" button inside each endpoint's expander (outside any `st.form`, using `st.button(f"Remove endpoint {i}", key=f"btn_remove_{i}")`)
-  - [ ] On click, call `remove_endpoint(...)`, write result to `st.session_state.state["parsed_api_model"]`, then `st.rerun()`
-  - [ ] After removal, if zero endpoints remain, the panel must show the empty-state message (already implemented in Story 2.1 pipeline node — no new logic needed, just trigger `st.rerun()`)
-  - [ ] Do NOT add a confirmation dialog — removal is immediate
+- [x] Task 4: Add "Remove endpoint" button per endpoint in `app.py` (AC: 3, 4)
+  - [x] Add a "Remove" button inside each endpoint's expander (outside any `st.form`, using `st.button(f"Remove endpoint {i}", key=f"btn_remove_{i}")`)
+  - [x] On click, call `remove_endpoint(...)`, write result to `st.session_state.state["parsed_api_model"]`, then `st.rerun()`
+  - [x] After removal, if zero endpoints remain, the panel must show the empty-state message (already implemented in Story 2.1 pipeline node — no new logic needed, just trigger `st.rerun()`)
+  - [x] Do NOT add a confirmation dialog — removal is immediate
 
-- [ ] Task 5: Add focused automated tests for spec-mutation helpers (AC: 1, 2, 3)
-  - [ ] Add `tests/test_spec_editor.py` covering:
+- [x] Task 5: Add focused automated tests for spec-mutation helpers (AC: 1, 2, 3)
+  - [x] Add `tests/test_spec_editor.py` covering:
     - `update_endpoint_field` — updates a known field; leaves other endpoints untouched; returns new dict (not same reference)
     - `add_endpoint` — appends a valid endpoint; raises `ValueError` for missing `path` or `method`; preserves existing endpoints
     - `remove_endpoint` — removes the correct endpoint by index; no-op for out-of-range index; does not affect other endpoints
-  - [ ] Keep all tests offline and deterministic; no Streamlit imports in test file
+  - [x] Keep all tests offline and deterministic; no Streamlit imports in test file
+
+### Review Findings
+
+- [x] [Review][Decision] AC2 wording vs implemented add-endpoint form — **Resolved (2026-04-04):** AC2 rewritten to match canonical endpoint shape and endpoint-level form fields (no separate parameter/schema editors in this story).
+
+- [x] [Review][Patch] Broad `except Exception` in `review_spec` handlers — **Resolved (2026-04-04):** Remove/save paths no longer wrap `spec_editor` calls that cannot raise; add path keeps only `except ValueError` for `add_endpoint`.
+
+- [x] [Review][Patch] Unreachable validation branch for empty method on add-endpoint — **Resolved (2026-04-04):** Removed dead `elif` branch; path-only validation remains.
 
 ## Dev Notes
 
@@ -183,20 +191,28 @@ Use `st.form` for the per-endpoint edit and add-endpoint forms. This is the corr
 
 ### Agent Model Used
 
-_TBD_
+Cursor agent (Claude) — dev-story workflow
 
 ### Debug Log References
 
-_TBD_
+None
 
 ### Completion Notes List
 
-_TBD_
+- Implemented pure `copy.deepcopy`-based helpers in `app/utils/spec_editor.py` (`update_endpoint_field`, `add_endpoint`, `remove_endpoint`); invalid edit index leaves model unchanged; `add_endpoint` validates non-empty `path`/`method` (strip-aware).
+- `review_spec` in `app.py`: summary table retained above per-endpoint expanders; each expander keeps Story 2.1 read-only detail, then `Remove endpoint {i}` (outside form), then `st.form(f"form_edit_{i}")` with Save → chained `update_endpoint_field` writes to `st.session_state.state["parsed_api_model"]` + `st.rerun()`. Method compare uses uppercase normalization.
+- `+ Add endpoint` expander + `form_add_endpoint` builds canonical endpoint dict; empty path shows `st.error` without calling `add_endpoint`.
+- Added `tests/test_spec_editor.py` (9 tests); full suite `157 passed`; `ruff check` + `ruff format` on touched files.
+- Code review (2026-04-04): AC2 aligned to implementation; removed broad `except Exception` on remove/save; add-endpoint keeps `ValueError` only; removed dead method-empty branch.
 
 ### File List
 
-_TBD_
+- `app/utils/spec_editor.py` (new)
+- `tests/test_spec_editor.py` (new)
+- `app.py` (modified — `review_spec` editing UI + imports)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — story status `done`)
 
 ### Change Log
 
-_TBD_
+- 2026-04-04: Story 2.2 — spec editor helpers, review panel edit/add/remove, unit tests; story and sprint status set to `review`.
+- 2026-04-04: Code review — AC2 text fix, exception handling cleanup, sprint/story status `done`.
