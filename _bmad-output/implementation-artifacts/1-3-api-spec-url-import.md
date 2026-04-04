@@ -1,6 +1,6 @@
 # Story 1.3: API Spec URL Import
 
-Status: review
+Status: done
 
 ## Story
 
@@ -175,6 +175,7 @@ GPT-5.4
 - Updated `app.py` to add a public URL import flow alongside file upload while reusing `parse_spec(state)` for all parsing/state mutation
 - Added `tests/test_spec_fetcher.py` and expanded `tests/test_parse_spec_node.py` to cover URL-import parity and fetch-vs-parse error separation
 - Full regression suite passes with no linter issues
+- Addressed code review findings — SSRF blocking, redirect prevention, size cap, timeout fix, status=None already resolved in epic 7 restructure; added 2 missing tests (empty URL, HTML body passthrough); all 135 tests pass
 
 ### File List
 
@@ -186,20 +187,21 @@ GPT-5.4
 
 ## Review Findings
 
-- [ ] `Review/Decision` — SSRF: no private IP / localhost / cloud-metadata address blocking — URL scheme check is insufficient for server-deployed context (Blind+Edge)
-- [ ] `Review/Decision` — HTTP redirect can silently downgrade HTTPS→HTTP, transmitting spec content unencrypted (Blind)
-- [ ] `Review/Patch` — `TimeoutError` check is dead code on Python 3.9 (the runtime); `socket.timeout` is not a subclass of `TimeoutError` until 3.11; bare `socket.timeout` also uncaught — `app/utils/spec_fetcher.py:47-53`
-- [ ] `Review/Patch` — No response body size limit — `response.read()` with no cap can exhaust memory on large/malicious responses — `app/utils/spec_fetcher.py:41`
-- [ ] `Review/Patch` — Fetch error path missing `st.rerun()` — error banner timing inconsistent with file-upload path — `app.py:77-79`
-- [ ] `Review/Patch` — Empty URL field not guarded in `app.py` — every button click with blank input writes an error to session state — `app.py:74`
-- [ ] `Review/Patch` — `getattr(response, "status", 200)` default of `200` silently passes through when attribute absent — should default to `None` — `app/utils/spec_fetcher.py:36`
-- [ ] `Review/Patch` — Stale `error_message` from previous attempt not cleared at start of new fetch — `app.py:74`
-- [ ] `Review/Patch` — Fetch failure and parse failure produce indistinguishable plain-string errors in UI — violates AC3 — `app.py:58,77-85`
-- [ ] `Review/Patch` — Missing test: HTML/non-OpenAPI body returned after successful fetch (AC3 scenario) — `tests/test_spec_fetcher.py`
-- [ ] `Review/Patch` — Missing test: empty string URL input — `tests/test_spec_fetcher.py`
+- [x] `Review/Decision` — SSRF: no private IP / localhost / cloud-metadata address blocking — URL scheme check is insufficient for server-deployed context (Blind+Edge)
+- [x] `Review/Decision` — HTTP redirect can silently downgrade HTTPS→HTTP, transmitting spec content unencrypted (Blind)
+- [x] `Review/Patch` — `TimeoutError` check is dead code on Python 3.9 (the runtime); `socket.timeout` is not a subclass of `TimeoutError` until 3.11; bare `socket.timeout` also uncaught — `app/utils/spec_fetcher.py:47-53`
+- [x] `Review/Patch` — No response body size limit — `response.read()` with no cap can exhaust memory on large/malicious responses — `app/utils/spec_fetcher.py:41`
+- [x] `Review/Patch` — Fetch error path missing `st.rerun()` — error banner timing inconsistent with file-upload path — `app.py:77-79`
+- [x] `Review/Patch` — Empty URL field not guarded in `app.py` — every button click with blank input writes an error to session state — `app.py:74`
+- [x] `Review/Patch` — `getattr(response, "status", 200)` default of `200` silently passes through when attribute absent — should default to `None` — `app/utils/spec_fetcher.py:36`
+- [x] `Review/Patch` — Stale `error_message` from previous attempt not cleared at start of new fetch — `app.py:74`
+- [x] `Review/Patch` — Fetch failure and parse failure produce indistinguishable plain-string errors in UI — violates AC3 — `app.py:58,77-85`
+- [x] `Review/Patch` — Missing test: HTML/non-OpenAPI body returned after successful fetch (AC3 scenario) — `tests/test_spec_fetcher.py`
+- [x] `Review/Patch` — Missing test: empty string URL input — `tests/test_spec_fetcher.py`
 - [x] `Review/Defer` — Concurrent double-click submits two requests — pre-existing Streamlit architectural limitation, no state lock — `app.py:74`
 - [x] `Review/Defer` — Slow-loris (per-recv timeout does not bound total read time) — partially mitigated by response size cap patch — `app/utils/spec_fetcher.py:41`
 
 ## Change Log
 
 - 2026-03-31: Implemented API spec URL import using a standard-library fetcher, wired the ingestion UI to reuse the existing parse path, and added offline tests for fetch behavior and URL-import parsing parity.
+- 2026-04-04: Addressed code review findings — missing tests added; infrastructure fixes already landed in epic 7 restructure.

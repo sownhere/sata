@@ -29,6 +29,11 @@ from src.ui.components import (
     render_gap_input,
     render_pipeline_visualization,
 )
+from src.ui.spec_review import (
+    build_endpoint_detail_view,
+    build_endpoint_summary_rows,
+    get_stage_display_label,
+)
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -62,7 +67,7 @@ if "conversation_banner" not in st.session_state:
 
 # ── Persistent stage header (UX-DR1) ──────────────────────────────────────
 stage = str(st.session_state.state.get("pipeline_stage") or "initial")
-stage_label = stage.replace("_", " ").title()
+stage_label = get_stage_display_label(stage)
 
 st.title("Sata — AI API Tester")
 st.subheader(f"Stage: {stage_label}")
@@ -71,7 +76,9 @@ st.divider()
 _conversation_starter = _load_prompt("conversation_starter").split("---", 1)
 CONVERSATION_PROMPT = _conversation_starter[0].strip()
 ZERO_ENDPOINT_FALLBACK_MESSAGE = (
-    _conversation_starter[1].strip() if len(_conversation_starter) > 1 else ""
+    _conversation_starter[1].strip()
+    if len(_conversation_starter) > 1
+    else "No endpoints were found in your spec. Let's describe them together."
 )
 
 
@@ -137,11 +144,15 @@ def _finalize_parsed_state_after_ingestion(updated_state):
     if not model:
         return updated_state
 
-    next_node = record_route_transition(updated_state, "parse_spec")
     endpoints = model.get("endpoints") or []
     if len(endpoints) == 0:
+        # Zero-endpoint fallback — record the correct route before switching
+        record_route_transition(
+            updated_state, "parse_spec", target_override="fill_gaps"
+        )
         return _start_conversation_flow(updated_state, ZERO_ENDPOINT_FALLBACK_MESSAGE)
 
+    next_node = record_route_transition(updated_state, "parse_spec")
     _reset_conversation_ui()
     if next_node == "detect_gaps":
         updated_state = run_pipeline_node(updated_state, "detect_gaps")
@@ -285,7 +296,6 @@ elif current_stage == "fill_gaps":
                 _append_assistant_message(
                     "Thanks. I captured your API structure and prepared it for review."
                 )
-                updated_state["pipeline_stage"] = "review_spec"
                 record_route_transition(
                     updated_state, "fill_gaps", target_override="review_spec"
                 )
@@ -328,17 +338,53 @@ elif current_stage == "fill_gaps":
 
 elif current_stage == "review_spec":
     model = state.get("parsed_api_model") or {}
-    endpoint_count = len(model.get("endpoints", []))
+    endpoints = model.get("endpoints") or []
+    top_level_auth = model.get("auth") or {}
+    endpoint_count = len(endpoints)
     plural = "s" if endpoint_count != 1 else ""
-    st.success(
-        f"Spec ready for review: found {endpoint_count} endpoint{plural}"
-        f" for '{model.get('title', 'API')}'."
-    )
+
+    # AC1: next-action copy (UX-DR2)
     st.info(
-        "**Next:** Story 2.1 will provide the full review panel."
-        " This story completes the clarification checkpoint."
+        "**Next required action:** Review your API spec below — "
+        "confirm to proceed or reject to re-parse."
     )
+
+    # API summary banner
+    st.markdown(
+        f"**{model.get('title', 'API')}** · v{model.get('version', 'unknown')}"
+        f" · {endpoint_count} endpoint{plural}"
+    )
+
+    # AC2: endpoint summary table
+    rows = build_endpoint_summary_rows(model)
+    if rows:
+        st.dataframe(rows, use_container_width=True)
+
+    # AC2: per-endpoint detail expanders
+    for endpoint in endpoints:
+        if not isinstance(endpoint, dict):
+            continue
+        detail = build_endpoint_detail_view(endpoint, top_level_auth=top_level_auth)
+        with st.expander(detail["heading"]):
+            st.markdown(f"**Summary:** {detail['summary']}")
+            st.markdown(f"**Operation ID:** {detail['operation_id']}")
+            st.markdown(f"**Auth:** {detail['auth']}")
+            st.markdown(f"**Tags:** {detail['tags']}")
+            st.markdown(f"**Parameters** ({detail['parameter_summary']})")
+            if detail["parameters"]:
+                st.dataframe(detail["parameters"], use_container_width=True)
+            st.markdown(f"**Request Body:** {detail['request_body_summary']}")
+            if detail["responses"]:
+                st.markdown("**Responses:**")
+                st.dataframe(detail["responses"], use_container_width=True)
+            else:
+                st.markdown("**Responses:** No responses documented")
+
+    # Clarifications captured — use code block to prevent markdown injection
     if state.get("gap_answers"):
         st.markdown("### Clarifications captured")
-        for gap_id, answer in state["gap_answers"].items():
-            st.write(f"- `{gap_id}`: {format_gap_answer(answer)}")
+        answers_text = "\n".join(
+            f"{gap_id}: {format_gap_answer(answer)}"
+            for gap_id, answer in state["gap_answers"].items()
+        )
+        st.code(answers_text, language=None)

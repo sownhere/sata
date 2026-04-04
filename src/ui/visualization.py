@@ -4,6 +4,8 @@ Canonical location: src.ui.visualization
 (Migrated from app/utils/pipeline_visualization.py — no logic changes.)
 """
 
+from langgraph.graph import END
+
 from src.core.graph import (
     CONDITIONAL_EDGE_LABELS,
     LINEAR_EDGE_LABELS,
@@ -19,11 +21,17 @@ def get_node_detail(node_name: str) -> dict:
 
 
 def get_default_visual_node(state: dict) -> str:
-    """Choose the best node for the detail panel when none is explicitly selected."""
-    if state.get("active_node") in PIPELINE_NODE_METADATA:
-        return state["active_node"]
+    """Choose the best node for the detail panel when none is explicitly selected.
+
+    Priority: explicit user selection > active node > pipeline stage mapping >
+    first node in order.  Note: 'active during execution' is architecturally
+    not renderable synchronously in Streamlit — the UI renders only after full
+    Python execution completes, so active_node reflects the last-run node.
+    """
     if state.get("selected_visual_node") in PIPELINE_NODE_METADATA:
         return state["selected_visual_node"]
+    if state.get("active_node") in PIPELINE_NODE_METADATA:
+        return state["active_node"]
     stage_node = PIPELINE_STAGE_TO_NODE.get(state.get("pipeline_stage"))
     if stage_node in PIPELINE_NODE_METADATA:
         return stage_node
@@ -60,6 +68,8 @@ def build_visualization_model(state: dict) -> dict:
 
     edges = []
     for source, target in CONDITIONAL_EDGE_LABELS:
+        if target == END:  # END is not a renderable node
+            continue
         edges.append(
             {
                 "source": source,
@@ -186,5 +196,10 @@ def _edge_style(status: str, is_conditional: bool) -> dict:
 
 
 def _dot_quote(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    escaped = (
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
     return f'"{escaped}"'

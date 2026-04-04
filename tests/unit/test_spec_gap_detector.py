@@ -2,7 +2,12 @@
 
 import json
 
-from src.tools.gap_detector import detect_spec_gaps
+from src.tools.gap_detector import (
+    _has_auth_ambiguity,
+    _has_missing_error_responses,
+    _has_missing_success_response,
+    detect_spec_gaps,
+)
 from src.tools.spec_parser import parse_openapi_spec
 
 GAP_SPEC_JSON = json.dumps(
@@ -159,3 +164,44 @@ def test_documented_no_content_success_response_is_not_flagged_as_missing():
     gaps = detect_spec_gaps(raw_spec, parsed_model)
 
     assert all(gap["gap_type"] != "missing_success_response" for gap in gaps)
+
+
+def test_has_missing_success_response_204_only_endpoint_returns_false():
+    """204-only endpoint must not trigger missing_success_response."""
+    endpoint = {"response_schemas": {"204": ""}}
+    assert _has_missing_success_response(endpoint) is False
+
+
+def test_has_missing_error_responses_returns_false_when_no_responses():
+    """Empty response_schemas must not trigger missing_error_responses."""
+    endpoint = {"response_schemas": {}}
+    assert _has_missing_error_responses(endpoint) is False
+
+
+def test_has_auth_ambiguity_and_combination_unsupported_scheme_returns_true():
+    """AND-combination where one scheme is unsupported must report ambiguity."""
+    spec = {
+        "components": {
+            "securitySchemes": {
+                "bearerAuth": {"type": "http", "scheme": "bearer"},
+                "digestAuth": {"type": "http", "scheme": "digest"},
+            }
+        }
+    }
+    # Requirement: both bearerAuth AND digestAuth must be satisfied
+    operation = {"security": [{"bearerAuth": [], "digestAuth": []}]}
+    assert _has_auth_ambiguity(spec, operation) is True
+
+
+def test_has_auth_ambiguity_and_combination_all_supported_returns_false():
+    """AND-combination where ALL schemes are supported must not report ambiguity."""
+    spec = {
+        "components": {
+            "securitySchemes": {
+                "bearerAuth": {"type": "http", "scheme": "bearer"},
+                "apiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"},
+            }
+        }
+    }
+    operation = {"security": [{"bearerAuth": [], "apiKey": []}]}
+    assert _has_auth_ambiguity(spec, operation) is False

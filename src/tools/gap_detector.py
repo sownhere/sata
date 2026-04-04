@@ -134,6 +134,8 @@ def _has_missing_success_response(endpoint: dict) -> bool:
         return True
 
     for code in success_codes:
+        if str(code) in ("204", "205"):
+            return False
         response = responses.get(code)
         if isinstance(response, dict) and response:
             return False
@@ -147,7 +149,7 @@ def _has_missing_success_response(endpoint: dict) -> bool:
 def _has_missing_error_responses(endpoint: dict) -> bool:
     responses = endpoint.get("response_schemas") or {}
     if not responses:
-        return True
+        return False  # already flagged by _has_missing_success_response
     return not any(not str(code).startswith("2") for code in responses)
 
 
@@ -162,13 +164,14 @@ def _has_auth_ambiguity(spec: dict, operation: dict) -> bool:
     schemes = (spec.get("components") or {}).get("securitySchemes") or {}
     for requirement in effective_security:
         if not isinstance(requirement, dict):
-            return True
-        for scheme_name in requirement:
-            scheme = schemes.get(scheme_name)
-            if not isinstance(scheme, dict):
-                return True
-            if _scheme_is_supported(scheme):
-                return False
+            continue
+        if not requirement:  # empty dict = explicit public option
+            return False
+        if all(
+            isinstance(schemes.get(name), dict) and _scheme_is_supported(schemes[name])
+            for name in requirement
+        ):
+            return False
     return True
 
 

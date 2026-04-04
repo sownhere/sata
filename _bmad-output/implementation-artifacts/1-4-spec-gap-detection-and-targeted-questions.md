@@ -1,6 +1,6 @@
 # Story 1.4: Spec Gap Detection & Targeted Questions
 
-Status: review
+Status: done
 
 ## Story
 
@@ -235,6 +235,21 @@ GPT-5 Codex
 - `tests/test_pipeline.py`
 - `tests/test_spec_gap_detector.py`
 
+## Review Findings
+
+- [x] `Review/Patch` — `_has_missing_success_response` flags 204 with empty description as missing — A 204 response with `{"description": "No Content"}` and no schema may be normalised to an empty string/`None` by the parser, incorrectly generating a gap question — `src/tools/gap_detector.py:136-144` — **resolved**: added `if str(code) in ("204", "205"): return False` guard in loop
+- [x] `Review/Patch` — `_has_missing_error_responses` fires simultaneously with `_has_missing_success_response` on empty `response_schemas`, producing two gap questions for the same endpoint — `src/tools/gap_detector.py:147-151` — **resolved**: changed `if not responses: return True` to `return False`; empty schemas are owned by `_has_missing_success_response`
+- [x] `Review/Patch` — `_apply_gap_answer` silently drops answers for `missing_success_response` and `missing_request_body` gap types; `parsed_api_model` is never updated, violating AC3 — `src/nodes/fill_gaps.py:97-117` — **resolved**: added handlers for both gap types that store answers as enrichments in the endpoint
+- [x] `Review/Patch` — `_apply_global_auth_if_unambiguous` overwrites global auth unconditionally when answer is "none", even if other unanswered auth gaps remain — `src/nodes/fill_gaps.py:152-165` — **resolved**: early return for `answer == "none"` without touching global auth
+- [x] `Review/Decision` — `fill_gaps` sets `pipeline_stage="spec_parsed"` on completion but `app.py` immediately overrides to `"review_spec"`; node and UI contracts are inconsistent — direct LangGraph invocation lands in wrong stage — `src/nodes/fill_gaps.py:45`, `app.py:288` — **DEFERRED**: will be fixed in story 1-5's scope since it is in the conversational path
+- [ ] `Review/Patch` — `_route_gaps` routes `None` detected_gaps to `review_spec` on `detect_gaps` failure, bypassing the error state in a native LangGraph invocation — `src/core/graph.py:173-175`, `src/nodes/detect_gaps.py:29-34`
+- [ ] `Review/Patch` — Stale gap answers silently discarded with no user warning when re-imported spec changes gap IDs — `src/nodes/detect_gaps.py:20-25`
+- [x] `Review/Patch` — `_has_auth_ambiguity` is overly optimistic on AND-combination security requirements; returns False as soon as any one scheme is supported, ignoring unsupported sibling schemes — `src/tools/gap_detector.py:163-172` — **resolved**: rewrote loop so all schemes in an AND-requirement must be supported; early exit only on a fully-supported requirement
+- [x] `Review/Patch` — No test asserts `parsed_api_model` is actually updated after a `missing_success_response` answer; existing test is a false positive for AC3 — `tests/integration/test_pipeline.py:223-281` — **resolved**: added `test_fill_gaps_updates_parsed_api_model_for_missing_success_response_answer` and three unit tests for the new heuristic edge cases
+- [x] `Review/Decision` — Double-filtering of gap_answers (UI strips blank selects before writing to state; node filters again) allows blank select to silently retain a prior answer — `app.py:316-321`, `src/ui/components.py:22-33` — **DEFERRED**: requires user input; deferred to future story
+- [x] `Review/Defer` — `_route_results` always returns `END`, making the "deeper analysis" edge permanently unreachable; pre-existing stub for a future story — `src/core/graph.py:188-191`
+
 ## Change Log
 
 - 2026-03-31: Implemented Story 1.4 gap detection, clarification state handling, Streamlit clarification UI, and focused regression coverage; full test suite passes.
+- 2026-04-04: Applied review-round patch fixes — 204/205 success-response guard, double-gap prevention on empty schemas, `missing_success_response` and `missing_request_body` answer handlers, `_apply_global_auth_if_unambiguous` "none" early return, AND-combination auth ambiguity logic; added 5 targeted tests; 140 tests pass, ruff clean.

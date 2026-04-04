@@ -90,3 +90,96 @@ def test_build_endpoint_detail_view_handles_empty_and_string_values():
     assert detail["responses"] == [{"status_code": "200", "summary": "OK"}]
     assert detail["auth"] == "Not required"
     assert detail["tags"] == "No tags"
+
+
+def test_build_endpoint_detail_view_returns_empty_dict_for_none_input():
+    assert build_endpoint_detail_view(None) == {}
+
+
+def test_build_endpoint_detail_view_uses_top_level_auth_when_provided():
+    endpoint = {
+        "path": "/secure",
+        "method": "POST",
+        "operation_id": "createItem",
+        "summary": "Create item",
+        "parameters": [],
+        "request_body": None,
+        "response_schemas": {"201": {"type": "object"}},
+        "auth_required": True,
+        "tags": [],
+    }
+    top_level_auth = {
+        "type": "bearer",
+        "scheme": "Bearer",
+        "in": "header",
+        "name": "Authorization",
+    }
+
+    detail = build_endpoint_detail_view(endpoint, top_level_auth=top_level_auth)
+
+    assert detail["auth"] == "Required"
+
+
+def test_build_endpoint_detail_view_without_top_level_auth_shows_unavailable():
+    endpoint = {
+        "path": "/secure",
+        "method": "GET",
+        "operation_id": "getItem",
+        "summary": "Get item",
+        "parameters": [],
+        "request_body": None,
+        "response_schemas": {"200": {"type": "object"}},
+        "auth_required": True,
+        "tags": [],
+    }
+
+    detail = build_endpoint_detail_view(endpoint)  # no top_level_auth
+
+    assert detail["auth"] == "Required (details unavailable)"
+
+
+def test_build_endpoint_detail_view_none_operation_id_and_summary_fallback():
+    endpoint = {
+        "path": "/anon",
+        "method": "DELETE",
+        "operation_id": None,
+        "summary": None,
+        "parameters": [],
+        "request_body": None,
+        "response_schemas": None,
+        "auth_required": False,
+        "tags": [],
+    }
+
+    detail = build_endpoint_detail_view(endpoint)
+
+    assert detail["operation_id"] == "-"
+    assert detail["summary"] == "No summary provided"
+    assert detail["responses"] == []
+
+
+def test_build_endpoint_detail_view_absent_response_schemas_key():
+    """Endpoint dict with no response_schemas key at all must not raise."""
+    endpoint = {
+        "path": "/minimal",
+        "method": "GET",
+        "operation_id": "minimal",
+        "summary": "Minimal",
+        "parameters": [],
+        "request_body": None,
+        # response_schemas intentionally absent
+        "auth_required": False,
+        "tags": [],
+    }
+
+    detail = build_endpoint_detail_view(endpoint)
+
+    assert detail["responses"] == []
+
+
+def test_request_body_summary_returns_no_request_body_for_empty_dict():
+    from src.ui.spec_review import _request_body_summary
+
+    assert _request_body_summary({}) == "No request body"
+    assert _request_body_summary(None) == "No request body"
+    assert _request_body_summary({"type": "object"}) == "object"

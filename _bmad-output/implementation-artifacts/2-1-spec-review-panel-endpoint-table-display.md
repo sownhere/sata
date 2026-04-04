@@ -1,6 +1,6 @@
 # Story 2.1: Spec Review Panel - Endpoint Table Display
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -249,6 +249,9 @@ GPT-5.4
 - `pytest -q tests/test_review_spec_node.py tests/test_spec_review.py tests/test_pipeline.py tests/test_pipeline_visualization.py tests/test_state.py` -> 38 passed
 - `pytest -q` -> 167 passed
 - `python3 -m compileall app.py app` -> success
+- [Code review follow-up] Fixed all 11 review findings: wired `get_stage_display_label`, implemented AC2 panel, fixed `build_endpoint_detail_view` auth/None-guard, fixed `_request_body_summary` for `{}`, reset `spec_confirmed` on re-entry, fixed gap_answers markdown injection, added 7 new tests
+- `pytest -q` -> 135 passed (test count reflects Epic 7 restructure)
+- `ruff check` + `ruff format --check` -> all checks passed
 
 ### Completion Notes List
 
@@ -258,6 +261,14 @@ GPT-5.4
 - Created a reference note in `docs/spec-review-panel-reference.md` documenting the review-panel contract and scope boundary
 - Added focused tests for review-stage behavior and formatting helpers, and kept the full regression suite green
 - Restored pre-existing visualization/state support contracts required by the current test suite so Story 2.1 could be validated end-to-end without regressions
+- [Review follow-up] Wired `get_stage_display_label` in `app.py` stage header (AC1 fix)
+- [Review follow-up] Replaced placeholder `review_spec` branch with real `st.dataframe` + `st.expander` panel (AC2 fix)
+- [Review follow-up] Added optional `top_level_auth` param to `build_endpoint_detail_view`; callers pass model auth
+- [Review follow-up] Added `None` guard to `build_endpoint_detail_view`
+- [Review follow-up] Fixed `_request_body_summary` to treat empty `{}` as "No request body"
+- [Review follow-up] Reset `spec_confirmed = False` in `review_spec` node happy path to prevent stale bypass
+- [Review follow-up] Changed gap_answers rendering from `st.write` to `st.code` to prevent markdown injection
+- [Review follow-up] Added 7 new tests covering the above fixes
 
 ### File List
 
@@ -267,10 +278,27 @@ GPT-5.4
 - `app/utils/spec_review.py`
 - `app/utils/pipeline_visualization.py`
 - `docs/spec-review-panel-reference.md`
-- `tests/test_pipeline.py`
-- `tests/test_review_spec_node.py`
-- `tests/test_spec_review.py`
+- `src/nodes/review_spec.py`
+- `src/ui/spec_review.py`
+- `tests/integration/test_review_spec_node.py`
+- `tests/unit/test_spec_review.py`
+
+## Review Findings
+
+- [x] `Review/Patch` — Stage header shows "Review Spec" not "Spec Review"; `get_stage_display_label()` is defined but never called in `app.py` — violates AC1 — `app.py:65`
+- [x] `Review/Patch` — Next-action text is a placeholder stub, not the AC-mandated string "Review your API spec below - confirm to proceed or reject to re-parse" — violates AC1 — `app.py:337-340`
+- [x] `Review/Patch` — AC2 entirely unimplemented: `build_endpoint_summary_rows` and `build_endpoint_detail_view` exist in `src/ui/spec_review.py` but are never called from the `review_spec` UI branch of `app.py` — `app.py:329-344`
+- [x] `Review/Decision` — `build_endpoint_detail_view` always passes `{}` for top-level auth — resolved by adding optional `top_level_auth` parameter; callers in `app.py` now pass the model's auth dict — `src/ui/spec_review.py`
+- [x] `Review/Patch` — `build_endpoint_detail_view` has no guard for `None` argument; raises `AttributeError` on `.get("parameters")` — `src/ui/spec_review.py:48-50`
+- [x] `Review/Patch` — `_schema_summary` returns "Schema defined" for empty dict `{}` request body instead of "No request body" — `src/ui/spec_review.py:95-98`, `137-146`
+- [x] `Review/Patch` — `review_spec` node does not reset `spec_confirmed`; a prior `True` value bypasses the review checkpoint on re-entry — `src/nodes/review_spec.py:16-18`
+- [x] `Review/Patch` — `gap_answers` rendered via `st.write` with user free-text; unintended markdown rendering from untrusted input — `app.py:344`
+- [x] `Review/Patch` — `tests/test_review_spec_node.py` does not exist; zero tests for `review_spec()` node logic — added `spec_confirmed` reset test and `error_message` clear test — `tests/integration/test_review_spec_node.py`
+- [x] `Review/Patch` — Missing test for `build_endpoint_detail_view` with absent `response_schemas` key — `tests/unit/test_spec_review.py`
+- [x] `Review/Patch` — Missing test for `operation_id`/`summary` `None` fallbacks in `build_endpoint_detail_view` — `tests/unit/test_spec_review.py`
+- [x] `Review/Defer` — `raw_spec` not rendered in review panel — constraint satisfied by omission, acceptable for this story scope
 
 ### Change Log
 
 - 2026-03-31: Implemented Story 2.1 Spec Review panel, added deterministic review helpers and docs reference note, and kept the regression suite green (`pytest -q` -> 167 passed).
+- 2026-04-04: Addressed code review findings — wired real AC1/AC2 panel in `app.py`, fixed `build_endpoint_detail_view` auth and None guard, fixed `_request_body_summary` for empty dict, reset `spec_confirmed` on node re-entry, fixed gap_answers markdown injection, added 7 new tests; 135 passed, all lint checks green.

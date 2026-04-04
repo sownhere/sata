@@ -15,4 +15,6 @@ def review_spec(state: SataState) -> SataState:
 
     state["error_message"] = None
     state["pipeline_stage"] = "review_spec"
+    # Reset so a prior confirmation cannot bypass the checkpoint on re-import.
+    state["spec_confirmed"] = False
     return state

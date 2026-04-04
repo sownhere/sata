@@ -17,6 +17,16 @@ def fill_gaps(state: SataState) -> SataState:
             state["pipeline_stage"] = "fill_gaps"
             return state
 
+        iteration_count = (state.get("iteration_count") or 0) + 1
+        state["iteration_count"] = iteration_count
+        if iteration_count > 10:
+            state["error_message"] = (
+                "Could not build a complete API model after several exchanges."
+                " Please restart and try describing your endpoints more concisely."
+            )
+            state["pipeline_stage"] = "spec_ingestion"
+            return state
+
         try:
             result = extract_api_model_from_conversation(conversation_messages)
         except ValueError as exc:
@@ -42,7 +52,7 @@ def fill_gaps(state: SataState) -> SataState:
         state["detected_gaps"] = None
         state["gap_answers"] = None
         state["error_message"] = None
-        state["pipeline_stage"] = "spec_parsed"
+        state["pipeline_stage"] = "review_spec"
         return state
 
     detected_gaps = state.get("detected_gaps") or []
@@ -95,6 +105,20 @@ def _is_actionable_answer(gap: dict, answer) -> bool:
 
 
 def _apply_gap_answer(parsed_api_model: dict, gap: dict, answer) -> None:
+    if gap.get("gap_type") == "missing_success_response":
+        endpoint = _find_endpoint(parsed_api_model, gap)
+        if endpoint is not None:
+            response_schemas = endpoint.setdefault("response_schemas", {})
+            if not response_schemas.get("200"):
+                response_schemas["200"] = str(answer)
+        return
+
+    if gap.get("gap_type") == "missing_request_body":
+        endpoint = _find_endpoint(parsed_api_model, gap)
+        if endpoint is not None and not endpoint.get("request_body"):
+            endpoint["request_body"] = str(answer)
+        return
+
     if gap.get("gap_type") == "auth_ambiguity":
         target_answer = str(answer)
         for endpoint in parsed_api_model.get("endpoints", []):
@@ -150,15 +174,12 @@ def _auth_state_from_answer(answer: str) -> dict:
 
 
 def _apply_global_auth_if_unambiguous(parsed_api_model: dict, answer: str) -> None:
+    if answer == "none":
+        return  # Public endpoint — don't alter global auth config
     auth_required_endpoints = [
         ep for ep in parsed_api_model.get("endpoints", []) if ep.get("auth_required")
     ]
-    auth = parsed_api_model.setdefault("auth", {})
-    if answer == "none":
-        if not auth_required_endpoints:
-            auth.clear()
-            auth.update(_auth_state_from_answer("none"))
-        return
     if len(auth_required_endpoints) == 1:
+        auth = parsed_api_model.setdefault("auth", {})
         auth.clear()
         auth.update(_auth_state_from_answer(answer))
