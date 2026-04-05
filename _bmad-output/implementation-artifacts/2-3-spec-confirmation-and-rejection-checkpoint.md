@@ -1,6 +1,6 @@
 # Story 2.3: Spec Confirmation & Rejection Checkpoint
 
-Status: review
+Status: done
 
 ## Story
 

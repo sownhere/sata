@@ -129,17 +129,289 @@ def test_record_route_transition_from_review_spec_uses_confirmation_state():
     assert rejected_target == "ingest_spec"
 
 
-def test_generate_tests_sets_visible_stage_and_clears_stale_error():
+def test_generate_tests_populates_state_for_confirmed_spec(monkeypatch):
     state = initial_state()
-    state["pipeline_stage"] = "review_spec"
-    state["error_message"] = "stale review error"
     state["spec_confirmed"] = True
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {
+        "title": "Users API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [
+            {
+                "path": "/users",
+                "method": "GET",
+                "operation_id": "listUsers",
+                "summary": "List users",
+                "parameters": [],
+                "request_body": None,
+                "response_schemas": {"200": {"type": "array"}},
+                "auth_required": False,
+                "tags": [],
+            }
+        ],
+    }
+
+    generated_cases = [
+        {
+            "id": "tc-get-users-happy-path-1",
+            "endpoint_path": "/users",
+            "endpoint_method": "GET",
+            "category": "happy_path",
+            "priority": "P1",
+            "title": "GET /users happy path",
+            "description": "Returns 200",
+            "request_overrides": {},
+            "expected": {"status_code": 200},
+            "is_destructive": False,
+            "field_refs": [],
+        }
+    ]
+
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "generate_test_cases_for_model",
+        lambda parsed_model: {
+            "test_cases": generated_cases,
+            "failed_endpoints": [],
+            "category_counts": {"happy_path": 1},
+            "priority_counts": {"P1": 1},
+        },
+    )
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "filter_test_cases_against_confirmed_spec",
+        lambda test_cases, parsed_model: {"accepted": test_cases, "dropped": []},
+    )
 
     result = generate_tests(state)
 
     assert result is state
     assert result["pipeline_stage"] == "generate_tests"
+    assert result["test_cases"] == generated_cases
     assert result["error_message"] is None
+    assert result["spec_confirmed"] is True
+    assert result["test_plan_confirmed"] is False
+
+
+def test_generate_tests_handles_partial_failures_after_retry(monkeypatch):
+    state = initial_state()
+    state["spec_confirmed"] = True
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {
+        "title": "Users API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [
+            {"path": "/users", "method": "GET"},
+            {"path": "/orders", "method": "POST"},
+        ],
+    }
+
+    partial_cases = [
+        {
+            "id": "tc-get-users-happy-path-1",
+            "endpoint_path": "/users",
+            "endpoint_method": "GET",
+            "category": "happy_path",
+            "priority": "P1",
+            "title": "GET /users happy path",
+            "description": "Returns 200",
+            "request_overrides": {},
+            "expected": {"status_code": 200},
+            "is_destructive": False,
+            "field_refs": [],
+        }
+    ]
+
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "generate_test_cases_for_model",
+        lambda parsed_model: {
+            "test_cases": partial_cases,
+            "failed_endpoints": [
+                {
+                    "path": "/orders",
+                    "method": "POST",
+                    "error": "timeout after retry",
+                }
+            ],
+            "category_counts": {"happy_path": 1},
+            "priority_counts": {"P1": 1},
+        },
+    )
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "filter_test_cases_against_confirmed_spec",
+        lambda test_cases, parsed_model: {
+            "accepted": test_cases,
+            "dropped": [{"reason": "unknown_endpoint", "test_case": {"id": "x"}}],
+        },
+    )
+
+    result = generate_tests(state)
+
+    assert result["pipeline_stage"] == "generate_tests"
+    assert result["test_cases"] == partial_cases
+    assert result["spec_confirmed"] is True
+    assert result["test_plan_confirmed"] is False
+    assert result["error_message"].startswith("Partial generation:")
+    assert "1 endpoint(s) failed" in result["error_message"]
+
+
+def test_generate_tests_preserves_previous_cases_when_generation_fails(monkeypatch):
+    state = initial_state()
+    state["spec_confirmed"] = True
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {
+        "title": "Users API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [{"path": "/users", "method": "GET"}],
+    }
+    state["test_cases"] = [
+        {
+            "id": "tc-previous",
+            "endpoint_path": "/users",
+            "endpoint_method": "GET",
+            "category": "happy_path",
+            "priority": "P1",
+            "title": "Previous case",
+            "description": "Old but valid",
+            "request_overrides": {},
+            "expected": {"status_code": 200},
+            "is_destructive": False,
+            "field_refs": [],
+        }
+    ]
+
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "generate_test_cases_for_model",
+        lambda parsed_model: {
+            "test_cases": [],
+            "failed_endpoints": [
+                {"path": "/users", "method": "GET", "error": "timeout after retry"}
+            ],
+            "category_counts": {},
+            "priority_counts": {},
+        },
+    )
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "filter_test_cases_against_confirmed_spec",
+        lambda test_cases, parsed_model: {"accepted": [], "dropped": []},
+    )
+
+    result = generate_tests(state)
+
+    assert result["test_cases"] == [
+        {
+            "id": "tc-previous",
+            "endpoint_path": "/users",
+            "endpoint_method": "GET",
+            "category": "happy_path",
+            "priority": "P1",
+            "title": "Previous case",
+            "description": "Old but valid",
+            "request_overrides": {},
+            "expected": {"status_code": 200},
+            "is_destructive": False,
+            "field_refs": [],
+        }
+    ]
+    assert result["error_message"].startswith("Partial generation:")
+
+
+def test_generate_tests_preserves_previous_when_new_run_all_filtered(monkeypatch):
+    state = initial_state()
+    state["spec_confirmed"] = True
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {
+        "title": "Users API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [{"path": "/users", "method": "GET"}],
+    }
+    previous = [
+        {
+            "id": "tc-previous",
+            "endpoint_path": "/users",
+            "endpoint_method": "GET",
+            "category": "happy_path",
+            "priority": "P1",
+            "title": "Previous case",
+            "description": "Old but valid",
+            "request_overrides": {},
+            "expected": {"status_code": 200},
+            "is_destructive": False,
+            "field_refs": [],
+        }
+    ]
+    state["test_cases"] = list(previous)
+
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "generate_test_cases_for_model",
+        lambda parsed_model: {
+            "test_cases": [{"id": "bad", "endpoint_path": "/nope"}],
+            "failed_endpoints": [],
+            "category_counts": {},
+            "priority_counts": {},
+        },
+    )
+    monkeypatch.setattr(
+        sys.modules["src.nodes.generate_tests"],
+        "filter_test_cases_against_confirmed_spec",
+        lambda test_cases, parsed_model: {
+            "accepted": [],
+            "dropped": [{"reason": "invalid_test_case_shape"}],
+        },
+    )
+
+    result = generate_tests(state)
+
+    assert result["test_cases"] == previous
+    assert result["error_message"].startswith(
+        "Regeneration produced no valid test cases"
+    )
+    assert "discarded" in result["error_message"]
+
+
+def test_generate_tests_requires_spec_confirmation():
+    state = initial_state()
+    state["spec_confirmed"] = False
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {
+        "title": "Users API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [{"path": "/users", "method": "GET"}],
+    }
+
+    result = generate_tests(state)
+
+    assert result["pipeline_stage"] == "review_spec"
+    assert "Confirm the API spec" in result["error_message"]
+    assert result["test_plan_confirmed"] is False
+
+
+def test_generate_tests_handles_missing_endpoints_gracefully():
+    state = initial_state()
+    state["spec_confirmed"] = True
+    state["pipeline_stage"] = "review_spec"
+    state["parsed_api_model"] = {
+        "title": "Users API",
+        "version": "1.0.0",
+        "auth": {"type": None, "scheme": None, "in": None, "name": None},
+        "endpoints": [],
+    }
+
+    result = generate_tests(state)
+
+    assert result["pipeline_stage"] == "spec_ingestion"
+    assert "no confirmed endpoints" in result["error_message"].lower()
+    assert result["test_plan_confirmed"] is False
 
 
 def test_prepare_rejection_for_reparse_preserves_raw_spec_and_clears_review_state():
