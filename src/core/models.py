@@ -10,7 +10,20 @@ Usage:
 
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+ALLOWED_TEST_CATEGORIES = (
+    "happy_path",
+    "missing_data",
+    "invalid_format",
+    "wrong_type",
+    "auth_failure",
+    "boundary",
+    "duplicate",
+    "method_not_allowed",
+)
+
+ALLOWED_TEST_PRIORITIES = ("P1", "P2", "P3")
 
 
 class AuthModel(BaseModel):
@@ -111,3 +124,86 @@ class GapRecord(BaseModel):
 
     options: Optional[list[str]] = None
     """Allowed answer options for select-type gaps."""
+
+
+class TestCaseModel(BaseModel):
+    """Canonical test case record generated from a confirmed API spec."""
+
+    __test__ = False
+
+    id: str
+    endpoint_path: str
+    endpoint_method: str
+    category: str
+    priority: str
+    title: str
+    description: str = ""
+    request_overrides: dict = Field(default_factory=dict)
+    expected: dict = Field(default_factory=dict)
+    is_destructive: bool = False
+    field_refs: list[str] = Field(default_factory=list)
+
+    @field_validator("endpoint_method")
+    @classmethod
+    def _normalize_endpoint_method(cls, value: str) -> str:
+        normalized = str(value or "").strip().upper()
+        if not normalized:
+            raise ValueError("endpoint_method must not be empty.")
+        return normalized
+
+    @field_validator("endpoint_path")
+    @classmethod
+    def _validate_endpoint_path(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("endpoint_path must not be empty.")
+        return normalized
+
+    @field_validator("category")
+    @classmethod
+    def _normalize_category(cls, value: str) -> str:
+        normalized = (
+            str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+        )
+        if normalized not in ALLOWED_TEST_CATEGORIES:
+            raise ValueError(f"Unsupported test category: {value!r}")
+        return normalized
+
+    @field_validator("priority")
+    @classmethod
+    def _normalize_priority(cls, value: str) -> str:
+        normalized = str(value or "").strip().upper()
+        if normalized not in ALLOWED_TEST_PRIORITIES:
+            raise ValueError(f"Unsupported test priority: {value!r}")
+        return normalized
+
+    @field_validator("id")
+    @classmethod
+    def _normalize_id(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("id must not be empty.")
+        return normalized
+
+    @field_validator("title")
+    @classmethod
+    def _normalize_title(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("title must not be empty.")
+        return normalized
+
+    @field_validator("description")
+    @classmethod
+    def _normalize_description(cls, value: str) -> str:
+        return str(value or "").strip()
+
+    @field_validator("field_refs")
+    @classmethod
+    def _normalize_field_refs(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for item in value:
+            item_normalized = str(item or "").strip()
+            if item_normalized:
+                normalized.append(item_normalized)
+        return normalized

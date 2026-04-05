@@ -1,6 +1,16 @@
 """Unit tests for src.core.models — Pydantic v2 data contracts."""
 
-from src.core.models import ApiModel, AuthModel, EndpointModel, GapRecord
+import pytest
+
+from src.core.models import (
+    ALLOWED_TEST_CATEGORIES,
+    ALLOWED_TEST_PRIORITIES,
+    ApiModel,
+    AuthModel,
+    EndpointModel,
+    GapRecord,
+    TestCaseModel,
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -137,3 +147,90 @@ def test_gap_record_validates_with_options():
         options=["bearer", "apiKey", "none"],
     )
     assert gap.options == ["bearer", "apiKey", "none"]
+
+
+# ── TestCaseModel ─────────────────────────────────────────────────────────────
+
+
+def test_test_case_model_validates_and_normalizes_core_fields():
+    test_case = TestCaseModel(
+        id=" tc-1 ",
+        endpoint_path=" /users ",
+        endpoint_method="get",
+        category="method not allowed",
+        priority="p2",
+        title=" Method not allowed ",
+        description=" should reject unsupported method ",
+        field_refs=["", "limit", "  "],
+    )
+
+    assert test_case.id == "tc-1"
+    assert test_case.endpoint_path == "/users"
+    assert test_case.endpoint_method == "GET"
+    assert test_case.category == "method_not_allowed"
+    assert test_case.priority == "P2"
+    assert test_case.title == "Method not allowed"
+    assert test_case.description == "should reject unsupported method"
+    assert test_case.field_refs == ["limit"]
+
+
+def test_test_case_model_rejects_unsupported_category():
+    with pytest.raises(ValueError, match="Unsupported test category"):
+        TestCaseModel(
+            id="tc-1",
+            endpoint_path="/users",
+            endpoint_method="GET",
+            category="security_bypass",
+            priority="P1",
+            title="Invalid category",
+        )
+
+
+def test_test_case_model_rejects_unsupported_priority():
+    with pytest.raises(ValueError, match="Unsupported test priority"):
+        TestCaseModel(
+            id="tc-1",
+            endpoint_path="/users",
+            endpoint_method="GET",
+            category="happy_path",
+            priority="HIGH",
+            title="Invalid priority",
+        )
+
+
+def test_test_case_model_rejects_empty_id():
+    with pytest.raises(ValueError, match="id must not be empty"):
+        TestCaseModel(
+            id="   ",
+            endpoint_path="/users",
+            endpoint_method="GET",
+            category="happy_path",
+            priority="P1",
+            title="Valid title",
+        )
+
+
+def test_test_case_model_rejects_empty_title():
+    with pytest.raises(ValueError, match="title must not be empty"):
+        TestCaseModel(
+            id="tc-1",
+            endpoint_path="/users",
+            endpoint_method="GET",
+            category="happy_path",
+            priority="P1",
+            title="",
+        )
+
+
+def test_allowed_test_category_and_priority_constants_are_stable():
+    assert set(ALLOWED_TEST_CATEGORIES) == {
+        "happy_path",
+        "missing_data",
+        "invalid_format",
+        "wrong_type",
+        "auth_failure",
+        "boundary",
+        "duplicate",
+        "method_not_allowed",
+    }
+    assert set(ALLOWED_TEST_PRIORITIES) == {"P1", "P2", "P3"}

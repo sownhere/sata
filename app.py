@@ -9,7 +9,7 @@ Startup sequence:
 4. Render persistent stage header (UX-DR1).
 """
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import streamlit as st
 
@@ -195,7 +195,14 @@ state = st.session_state.state
 current_stage = state["pipeline_stage"]
 
 if state.get("error_message"):
-    st.error(state["error_message"])
+    _err = str(state["error_message"])
+    if current_stage == "generate_tests" and (
+        _err.startswith("Partial generation:")
+        or _err.startswith("Regeneration produced no valid test cases")
+    ):
+        st.warning(_err)
+    else:
+        st.error(_err)
 
 render_pipeline_visualization(state)
 
@@ -615,9 +622,58 @@ elif current_stage == "review_spec":
         st.code(answers_text, language=None)
 
 elif current_stage == "generate_tests":
-    st.success("Spec confirmed.")
+    test_cases = list(state.get("test_cases") or [])
     st.info(
-        "**Next required action:** Story 3.1 will implement actual test "
-        "generation. This placeholder stage confirms that Checkpoint 1 "
-        "advanced successfully."
+        "**Next required action:** Review the generated test plan below. "
+        "Story 3.2 will add category toggles and destructive-operation warnings."
     )
+
+    if not test_cases:
+        st.warning("No generated test cases are available yet.")
+    else:
+        st.success(
+            f"Generated {len(test_cases)} test case"
+            f"{'s' if len(test_cases) != 1 else ''} from the confirmed spec."
+        )
+
+        category_counts = Counter(
+            str(case.get("category") or "unknown") for case in test_cases
+        )
+        priority_counts = Counter(
+            str(case.get("priority") or "unknown") for case in test_cases
+        )
+
+        category_rows = [
+            {"category": category, "count": count}
+            for category, count in sorted(category_counts.items())
+        ]
+        priority_order = {"P1": 0, "P2": 1, "P3": 2}
+        priority_rows = [
+            {"priority": priority, "count": count}
+            for priority, count in sorted(
+                priority_counts.items(),
+                key=lambda item: (priority_order.get(item[0], 99), item[0]),
+            )
+        ]
+
+        category_col, priority_col = st.columns(2)
+        with category_col:
+            st.markdown("### Categories")
+            st.dataframe(category_rows, use_container_width=True)
+        with priority_col:
+            st.markdown("### Priorities")
+            st.dataframe(priority_rows, use_container_width=True)
+
+        preview_rows = [
+            {
+                "id": case.get("id"),
+                "method": case.get("endpoint_method"),
+                "path": case.get("endpoint_path"),
+                "category": case.get("category"),
+                "priority": case.get("priority"),
+                "title": case.get("title"),
+            }
+            for case in test_cases
+        ]
+        st.markdown("### Generated Test Cases")
+        st.dataframe(preview_rows, use_container_width=True)

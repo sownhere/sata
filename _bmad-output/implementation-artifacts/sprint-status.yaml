@@ -1,5 +1,5 @@
 # generated: 2026-03-30
-# last_updated: 2026-04-04 (2-3 implementation complete → review)
+# last_updated: 2026-04-05 (3-1 code review fixes -> done)
 # project: sata
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-30
-last_updated: 2026-04-04
+last_updated: 2026-04-05
 project: sata
 project_key: NOKEY
 tracking_system: file-system
@@ -52,15 +52,15 @@ development_status:
   epic-1-retrospective: optional
 
   # ─── Epic 2: Spec Review & Human Checkpoint ───
-  epic-2: in-progress
+  epic-2: done
   2-1-spec-review-panel-endpoint-table-display: done
   2-2-spec-editing-modify-add-and-remove-endpoints-and-fields: done
-  2-3-spec-confirmation-and-rejection-checkpoint: review
+  2-3-spec-confirmation-and-rejection-checkpoint: done
   epic-2-retrospective: optional
 
   # ─── Epic 3: Test Plan Generation & Configuration ───
-  epic-3: backlog
-  3-1-test-case-generation-categories-and-priorities: backlog
+  epic-3: in-progress
+  3-1-test-case-generation-categories-and-priorities: done
   3-2-test-plan-review-category-toggles-and-destructive-warnings: backlog
   3-3-test-plan-confirmation-and-rejection-checkpoint: backlog
   epic-3-retrospective: optional
