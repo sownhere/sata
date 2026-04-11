@@ -12,6 +12,7 @@ from src.ui.spec_review import (
 
 def test_get_stage_display_label_uses_explicit_mapping_for_review_spec():
     assert get_stage_display_label("review_spec") == "Spec Review"
+    assert get_stage_display_label("review_test_plan") == "Test Plan Review"
     assert get_stage_display_label("fill_gaps") == "Fill Gaps"
 
 

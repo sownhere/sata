@@ -26,3 +26,11 @@
 - `app/utils/env.py` shim has no test exercising the shim re-export path
 - `execution.request_timeout_seconds` not directly asserted in any test [`tests/unit/test_core_settings.py`]
 - Six orchestration helpers in `app.py` (`_conversation_mode_active` et al.) — defer extraction to `src/ui/` in a future story
+
+## Deferred from: code review of 3-2-test-plan-review-category-toggles-and-destructive-warnings (2026-04-11)
+
+- `priority_counts` in `build_test_plan_review_sections` silently drops non-canonical priority strings (`"p1"`, `"HIGH"`, etc.) — `Counter` uses only `.strip()` normalisation, so values outside `ALLOWED_TEST_PRIORITIES` produce all-zero counts with no warning. Upstream `TestCaseModel` enforces canonical values so this only surfaces with malformed/restored session state [`src/ui/test_plan_review.py:50`]
+
+## Deferred from: code review of 4-1-http-test-execution-with-auth-and-retry (2026-04-11)
+
+- Query-parameter `apiKey` injection is not supported. `get_auth_headers` only returns headers for `apiKey in: header` (and bearer); when a spec declares `securitySchemes.apiKey` with `in: query`, the key is silently dropped and requests go out unauthenticated. Story 4.1 AC3 ("auth headers injected from secure env vars") is only satisfied for the header case [`src/tools/http_executor.py:47-49`]. Deferred because real-world impact is low (most target APIs in our pipeline use header or bearer auth) and the fix requires plumbing auth into request-building — not a one-line change. When picked up, also update the FR wording to narrow AC3 to header/bearer, or extend `execute_single_test` to accept a query-param auth injection hook.

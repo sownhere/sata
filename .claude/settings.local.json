@@ -46,7 +46,9 @@
       "Bash(/opt/homebrew/bin/python3 -m pytest tests/ --tb=short -q)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(uvx ruff:*)",
-      "Bash(chmod +x /Users/sown/Documents/AI/sata/.githooks/pre-commit)"
+      "Bash(chmod +x /Users/sown/Documents/AI/sata/.githooks/pre-commit)",
+      "Bash(grep -n \"def.*llm\\\\|LLMClient\\\\|create_llm\\\\|ChatOpenAI\\\\|openai\" /Users/sown/Documents/AI/sata/src/core/*.py)",
+      "Bash(wc -l tests/unit/test_*.py tests/integration/test_*.py)"
     ]
   }
 }
