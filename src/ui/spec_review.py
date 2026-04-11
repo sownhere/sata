@@ -11,6 +11,8 @@ def get_stage_display_label(stage: str) -> str:
     normalized = str(stage or "initial")
     if normalized == "review_spec":
         return "Spec Review"
+    if normalized == "review_test_plan":
+        return "Test Plan Review"
     return normalized.replace("_", " ").title()
 
 

@@ -1,5 +1,6 @@
 """generate_tests pipeline node — Story 3.1 implementation."""
 
+from src.core.observability import append_reasoning_log
 from src.core.state import SataState
 from src.tools.test_case_generator import (
     filter_test_cases_against_confirmed_spec,
@@ -10,6 +11,15 @@ from src.tools.test_case_generator import (
 def generate_tests(state: SataState) -> SataState:
     """Generate and validate test cases from a confirmed API spec."""
     if not state.get("spec_confirmed"):
+        append_reasoning_log(
+            state,
+            stage="generate_tests",
+            event_type="reasoning",
+            reason=(
+                "Blocked test generation because the API spec has not been confirmed."
+            ),
+            details={"spec_confirmed": False},
+        )
         state["pipeline_stage"] = "review_spec"
         state["error_message"] = "Confirm the API spec before generating a test plan."
         state["test_plan_confirmed"] = False
@@ -18,6 +28,15 @@ def generate_tests(state: SataState) -> SataState:
     parsed_api_model = state.get("parsed_api_model") or {}
     endpoints = parsed_api_model.get("endpoints") or []
     if not isinstance(endpoints, list) or len(endpoints) == 0:
+        append_reasoning_log(
+            state,
+            stage="generate_tests",
+            event_type="reasoning",
+            reason=(
+                "Blocked test generation because no confirmed endpoints are available."
+            ),
+            details={"endpoint_count": 0},
+        )
         state["pipeline_stage"] = "spec_ingestion"
         state["error_message"] = (
             "Cannot generate tests because no confirmed endpoints are available."
@@ -26,6 +45,17 @@ def generate_tests(state: SataState) -> SataState:
         return state
 
     previous_cases = list(state.get("test_cases") or [])
+    append_reasoning_log(
+        state,
+        stage="generate_tests",
+        event_type="tool_call",
+        tool_name="test_case_generator.generate_test_cases_for_model",
+        reason="Generate categorized test cases from the confirmed API model.",
+        input_summary={
+            "endpoint_count": len(endpoints),
+            "auth_type": (parsed_api_model.get("auth") or {}).get("type"),
+        },
+    )
     generation = generate_test_cases_for_model(parsed_api_model)
     filtered = filter_test_cases_against_confirmed_spec(
         generation["test_cases"], parsed_api_model

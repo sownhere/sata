@@ -4,9 +4,12 @@ Canonical location: src.ui.components
 Extracted from app.py — presentation helpers only, no pipeline orchestration.
 """
 
+from __future__ import annotations
+
 import streamlit as st
 
 from src.core.graph import PIPELINE_NODE_ORDER
+from src.tools.redaction import sanitize_value
 from src.ui.visualization import (
     build_pipeline_graph_dot,
     get_default_visual_node,
@@ -102,3 +105,60 @@ def render_pipeline_visualization(current_state):
             src = last_edge["source"]
             tgt = last_edge["target"]
             st.caption(f"Most recent transition: `{src}` → `{tgt}`")
+
+
+def _sorted_reasoning_events(events: list[dict] | None) -> list[dict]:
+    """Return events sorted by insertion order, sanitized, in chronological order."""
+    ordered = sorted(
+        list(events or []),
+        key=lambda event: (
+            int(event.get("order") or 0),
+            str(event.get("timestamp") or ""),
+        ),
+    )
+    return [sanitize_value(event) for event in ordered]
+
+
+def group_reasoning_events(events: list[dict] | None) -> list[tuple[str, list[dict]]]:
+    """Group reasoning-log events into contiguous stage runs, preserving chronology.
+
+    Unlike a stage-keyed dict (which would fold re-run events back into an
+    earlier stage block), this groups only *consecutive* events that share a
+    stage so cross-stage re-runs render in strict chronological order.
+    """
+    grouped: list[tuple[str, list[dict]]] = []
+    for event in _sorted_reasoning_events(events):
+        stage = str(event.get("stage") or "unknown")
+        if grouped and grouped[-1][0] == stage:
+            grouped[-1][1].append(event)
+        else:
+            grouped.append((stage, [event]))
+    return grouped
+
+
+def render_reasoning_log_panel(current_state):
+    """Render a chronological reasoning-log panel for developer transparency."""
+    with st.expander("Developer: Reasoning Logs", expanded=False):
+        grouped = group_reasoning_events(current_state.get("reasoning_log") or [])
+        if not grouped:
+            st.caption("No reasoning or tool-call events have been recorded yet.")
+            return
+
+        for stage, events in grouped:
+            stage_label = stage.replace("_", " ").title()
+            st.markdown(f"**{stage_label}**")
+            for event in events:
+                event_type = str(event.get("event_type") or "reasoning")
+                badge = {
+                    "tool_call": "Tool Call",
+                    "reasoning": "Reasoning",
+                    "system_event": "System Event",
+                }.get(event_type, event_type.replace("_", " ").title())
+                tool_name = event.get("tool_name")
+                heading = f"{badge}: {tool_name}" if tool_name else badge
+                st.markdown(f"- **{heading}**")
+                st.caption(str(event.get("reason") or ""))
+                if event.get("input_summary"):
+                    st.json(event["input_summary"], expanded=False)
+                elif event.get("details"):
+                    st.json(event["details"], expanded=False)

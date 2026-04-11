@@ -1,5 +1,6 @@
 """parse_spec pipeline node — parses raw OpenAPI/Swagger spec."""
 
+from src.core.observability import append_reasoning_log
 from src.core.state import SataState
 from src.tools.spec_parser import parse_openapi_spec
 
@@ -12,10 +13,28 @@ def parse_spec(state: SataState) -> SataState:
     """
     raw = state.get("raw_spec")
     if not raw:
+        append_reasoning_log(
+            state,
+            stage="parse_spec",
+            event_type="reasoning",
+            reason="Skipped parsing because no raw spec content is available.",
+            details={"has_raw_spec": False},
+        )
         state["error_message"] = "No spec content found. Please upload a file."
         state["parsed_api_model"] = None
         return state
     try:
+        append_reasoning_log(
+            state,
+            stage="parse_spec",
+            event_type="tool_call",
+            tool_name="spec_parser.parse_openapi_spec",
+            reason="Normalize the supplied spec into Sata's canonical API model.",
+            input_summary={
+                "spec_source": state.get("spec_source"),
+                "raw_spec_length": len(str(raw)),
+            },
+        )
         model = parse_openapi_spec(raw)
         state["parsed_api_model"] = model
         state["pipeline_stage"] = "spec_parsed"
